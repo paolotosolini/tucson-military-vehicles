@@ -1,5 +1,5 @@
 import './styles.css';
-import { createNav } from './carousel';
+import { createCarousel, createNav } from './carousel';
 import { Tour, loadTour } from './tour';
 import { Viewer, type Pose } from './viewer';
 
@@ -21,6 +21,8 @@ async function start() {
 
     // UI is built straight away (the carousel's thumbnails can load while the model streams).
     createNav(tour, ui);
+    createCarousel(tour, ui, { thumbUrl: (stop) => `${base}${stop.thumbnail}` });
+    ui.classList.add('is-ready');
 
     const startStop = tour.stops[tour.startIndex()];
     const viewer = await Viewer.create({
@@ -37,7 +39,7 @@ async function start() {
     tour.start();
 
     loader.classList.add('is-done');
-    ui.classList.add('is-ready');
+    ui.classList.add('is-live');
     canvas.focus();
     // Handy for debugging in the console.
     Object.assign(window, { viewer, tour });

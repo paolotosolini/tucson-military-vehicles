@@ -36,6 +36,9 @@ export interface StopChange {
 
 type Listener = (change: StopChange) => void;
 
+/** Thumbnail file for a stop id, relative to public/. */
+export const thumbPath = (id: string) => `thumbs/${id}.webp`;
+
 /**
  * Tour state: the active stop, prev/next, and the `#stop-N` deep link.
  * The tour decides *which* stop is active; listeners (viewer, UI) react to changes.
@@ -44,6 +47,7 @@ export class Tour {
   readonly data: TourData;
   private current = -1;
   private listeners: Listener[] = [];
+  private listListeners: (() => void)[] = [];
 
   constructor(data: TourData) {
     this.data = data;
@@ -82,6 +86,32 @@ export class Tour {
 
   onChange(fn: Listener): void {
     this.listeners.push(fn);
+  }
+
+  /** Called when stops are added, removed, reordered or their text/pose edited (dev mode). */
+  onStopsChanged(fn: () => void): void {
+    this.listListeners.push(fn);
+  }
+
+  /**
+   * Tells listeners the stop list or a stop's content changed. Ids are renumbered to match the
+   * order (`stop-1` … `stop-N`), so deep links and thumbnail names always match the counter.
+   */
+  stopsChanged(): void {
+    this.stops.forEach((s, i) => {
+      s.id = `stop-${i + 1}`;
+      s.thumbnail = thumbPath(s.id);
+    });
+    if (this.current >= 0) {
+      const hash = `#${this.stop.id}`;
+      if (location.hash !== hash) history.replaceState(null, '', hash);
+    }
+    for (const fn of this.listListeners) fn();
+  }
+
+  /** Makes `index` active without a flight (used after structural edits). */
+  select(index: number): void {
+    this.set(Math.max(0, Math.min(index, this.count - 1)), true);
   }
 
   /** Activates the start stop without a flight. Call once, after listeners are attached. */

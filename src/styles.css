@@ -12,7 +12,7 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: #b9c6d2;
+  background: #17120e;
   color: var(--ink);
 }
 
@@ -28,7 +28,7 @@ html, body {
 
 .loader {
   position: fixed;
-  inset: 0;
+  inset: 0 340px 0 0; /* the carousel rail stays visible while the model loads */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -72,9 +72,11 @@ html, body {
   pointer-events: none; /* the canvas stays explorable; controls opt back in */
   opacity: 0;
   transition: opacity 600ms ease 200ms;
-  z-index: 5;
+  z-index: 11;
 }
 .ui.is-ready { opacity: 1; }
+.ui .nav { opacity: 0; visibility: hidden; transition: opacity 600ms ease 200ms, visibility 0s 800ms; }
+.ui.is-live .nav { opacity: 1; visibility: visible; transition-delay: 200ms, 0s; }
 
 .nav {
   position: absolute;
@@ -128,3 +130,113 @@ html, body {
   z-index: 4; /* above the canvas, below the tour UI */
 }
 .fade.is-on { opacity: 1; }
+
+/* ---- Carousel rail ---- */
+.rail {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  background: linear-gradient(to left, rgba(20, 16, 12, 0.62), rgba(20, 16, 12, 0.48));
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: auto;
+  /* fade cards out at the top and bottom edges */
+  mask-image: linear-gradient(to bottom, transparent 0, #000 48px, #000 calc(100% - 48px), transparent 100%);
+}
+.rail::-webkit-scrollbar { display: none; }
+
+.rail__list {
+  list-style: none;
+  margin: 0;
+  /* let the first and last cards reach the centre */
+  padding: calc(50vh - 110px) 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card {
+  scroll-snap-align: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+  opacity: 0.72;
+  transition: opacity 250ms ease, background 250ms ease, border-color 250ms ease, box-shadow 250ms ease;
+}
+.card:hover { opacity: 0.92; }
+.card.is-active {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.card__select { cursor: pointer; outline: none; display: block; }
+.card__select:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.card__thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(224, 164, 88, 0.35), transparent 60%),
+    linear-gradient(160deg, #4a3b2c, #241b14);
+}
+.card__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.card.no-thumb .card__thumb img { visibility: hidden; }
+.card__num {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.card.is-active .card__num { background: var(--accent); color: #1b140e; }
+
+.card__title {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Description + actions expand on the active card only. */
+.card__more {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 300ms ease;
+}
+.card.is-active .card__more { grid-template-rows: 1fr; }
+.card__more-inner { overflow: hidden; }
+.card__desc {
+  margin: -4px 14px 14px;
+  color: var(--ink-dim);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.card__actions:empty { display: none; }
+.card__actions { padding: 0 14px 14px; display: flex; gap: 8px; }
+
+/* keep the nav bar clear of the rail */
+.nav { max-width: calc(100vw - 340px - 48px); }
