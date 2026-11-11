@@ -5,7 +5,8 @@ export type Drift = 'orbit' | 'sway' | 'none';
 export interface Stop {
   id: string;
   title: string;
-  description: string;
+  /** Optional; not shown in v1 (title-only cards), kept so text can return later. */
+  description?: string;
   camera: Pose;
   thumbnail: string;
   drift?: Drift;

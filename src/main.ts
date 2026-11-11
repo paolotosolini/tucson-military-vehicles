@@ -30,8 +30,12 @@ async function start() {
     loader.querySelector('.loader__subtitle')!.textContent = data.subtitle;
 
     // UI is built straight away (the carousel's thumbnails can load while the model streams).
-    createNav(tour, ui);
-    const carousel = createCarousel(tour, ui, { thumbUrl: (stop) => thumbs.url(stop) });
+    const nav = createNav(tour, ui);
+    // The drum; visitors who prefer reduced motion get a plain list instead.
+    const carousel = createCarousel(tour, ui, {
+      thumbUrl: (stop) => thumbs.url(stop),
+      mode: reducedMotion.matches ? 'flat' : 'drum',
+    });
     ui.classList.add('is-ready');
 
     const startStop = tour.stops[tour.startIndex()];
@@ -53,6 +57,7 @@ async function start() {
         tour,
         viewer,
         carousel,
+        nav,
         thumbs,
         ui,
         initialStatus: edits ? `Restored local edits from ${when}.` : undefined,
@@ -73,6 +78,7 @@ async function start() {
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const FADE_MS = 150; // each half of the 300 ms reduced-motion cross-fade
+
 
 /**
  * Stop changes fly the camera (or fade, with reduced motion), then start the stop's idle drift.

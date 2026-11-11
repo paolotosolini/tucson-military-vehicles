@@ -4,14 +4,14 @@ Nov 8, 2026 · @Paolo Tosolini
 
 ## Overview
 
-v1 is a desktop web page that shows the Goldfield Gaussian splat full-screen with a side carousel of 8–10 story stops. Selecting a stop flies the camera to a saved viewpoint and shows its title and description. It is built with Claude Code and hosted on GitHub Pages.
+v1 is a desktop web page that shows the Goldfield Gaussian splat full-screen with a 3D drum carousel of 8–10 stops on the right. Selecting a stop flies the camera to a saved viewpoint; each stop is a thumbnail with a short title (no description text in v1). It is built with Claude Code and hosted on GitHub Pages.
 
 **In scope**
 
 - Full-screen splat viewer with free orbit/fly controls
 - Stop 1: an overview of the whole scanned area with the tour title
-- Stops 2–N: placeholder text ("Stop 2" / "Description 2"), editable later
-- Vertical carousel on the right with a thumbnail, title and description per card
+- Stops 2–N: placeholder titles ("Stop 2"), editable later
+- Vertical 3D drum carousel on the right: one thumbnail per stop with its title over the image
 - Previous / Next buttons and arrow keys (looping), Home button back to the overview
 - Smooth camera move between stops, slow idle drift at each stop
 - Deep link per stop (`#stop-3`)
@@ -95,7 +95,6 @@ All tour content lives in `public/stops.json`. The app reads it on load; dev mod
     {
       "id": "stop-1",
       "title": "Goldfield Ghost Town",
-      "description": "Overview of the scanned area.",
       "camera": {
         "position": [12.4, 8.1, -3.0],
         "target":   [0.0, 1.2, 0.0],
@@ -107,7 +106,6 @@ All tour content lives in `public/stops.json`. The app reads it on load; dev mod
     {
       "id": "stop-2",
       "title": "Stop 2",
-      "description": "Description 2",
       "camera": { "position": [3.2, 1.7, 4.5], "target": [1.0, 1.5, 0.8], "fov": 55 },
       "thumbnail": "thumbs/stop-2.webp",
       "drift": "sway"
@@ -119,8 +117,8 @@ All tour content lives in `public/stops.json`. The app reads it on load; dev mod
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | Used for the deep link (`#stop-2`) and thumbnail filename |
-| `title` | string | Card heading, max \~40 characters |
-| `description` | string | 1–3 sentences, max \~300 characters |
+| `title` | string | Shown over the card's thumbnail and in the bottom bar, max \~30 characters |
+| `description` | string | Optional, not shown in v1 (kept so text can return later) |
 | `camera.position` | \[x, y, z\] | World units of the splat |
 | `camera.target` | \[x, y, z\] | Point the camera looks at; orbit pivot |
 | `camera.fov` | number | Vertical field of view, degrees |
@@ -131,27 +129,28 @@ Order in the array is tour order. Until poses are captured, ship 10 stops with p
 
 ## Viewer and tour behavior
 
-The splat fills the window; the carousel is a translucent rail on the right, about 340 px wide. The scene stays explorable at all times.
+The splat fills the window; the carousel floats over the right side, about 340 px wide, without a panel behind it. The scene stays explorable at all times.
 
 ```
 +--------------------------------------------+-------------+
+|                                            |   /thumb\   |  <- cards above tilt
+|                                            |  [ thumb ]  |     away on the drum
+|              splat (full-bleed)            | [[ thumb ]] |  <- active card: facing
+|                                            | [[Title  ]] |     you, accent border
 |                                            |  [ thumb ]  |
-|                                            |  Stop 1     |
-|              splat (full-bleed)            |  Desc...    |
-|                                            |-------------|
-|                                            |  [ thumb ]  | <- active card
-|                                            |  Stop 2     |    (expanded,
-|                                            |  Desc ...   |     accent border)
-|                                            |-------------|
-| [⌂] Goldfield Ghost Town      [<] 2/10 [>] |  [ thumb ]  |
+| [⌂] Stop title             [<] 2/10 [>]    |   \thumb/   |
 +--------------------------------------------+-------------+
 ```
 
 **Carousel**
 
-- One card per stop: thumbnail (16:9), title, description. The active card is expanded and highlighted; others show thumbnail and title only.
-- Clicking a card selects it. Scrolling the rail with the mouse wheel snaps to the nearest card and selects it after a short pause (\~250 ms), so fast scrolling does not trigger a flight per card.
-- The active card scrolls into view when the stop changes by any route.
+- Cards sit on a vertical drum (a cylinder rolling around a horizontal axis), about 24° apart, turned slightly inward to face the middle of the screen. About five cards are visible; the active one faces the viewer at the centre.
+- Each card: 16:9 thumbnail, the stop number top-left, and the title over the bottom of the image on a dark gradient. The active card has an accent border.
+- Tapping or clicking any visible card selects it.
+- Wheel, trackpad and vertical drag spin the drum with light physics: a spring follows the input, a released drag coasts briefly (~0.1 s), and the drum settles on a whole card. One mouse-wheel notch moves one card. The card it comes to rest on is selected as it settles, so a fast spin never flies the camera to every card it passes.
+- Next / Prev / arrow keys / Home spin the drum to the active card the short way round; looping rolls straight on from the last stop to the first.
+- With `prefers-reduced-motion`, the drum is replaced by a plain vertical list.
+- The bottom bar shows the active stop's title (stop 1's title on the overview) next to the counter.
 
 **Navigation**
 
@@ -186,7 +185,7 @@ Dev mode is how you author the tour: fly to a view, snap it, type the text, expo
 
 - Free-fly camera: WASD + right-drag to look, Q/E down/up, Shift for faster movement. Left-drag orbit stays available. Idle drift is off in dev mode.
 - A HUD shows the live camera position, target and FOV, plus a FOV slider.
-- An edit panel replaces the card text for the active stop: title and description inputs, drift dropdown.
+- The HUD includes an editor for the active stop: title input (max 30 characters) and drift dropdown, with Delete.
 
 **Actions**
 
@@ -206,8 +205,9 @@ Dev mode is how you author the tour: fly to a view, snap it, type the text, expo
 
 **Export**
 
-- Preferred (Chrome/Edge): the File System Access API. The first export asks you to pick the repo's `public/` folder, then writes `stops.json` and `thumbs/*.webp` directly. You review the diff and commit.
-- Fallback: download a `.zip` with the same layout to unzip into `public/`.
+- Preferred (`npm run dev`): the dev server has a small save endpoint (dev only, never in the build) that writes `stops.json` and `thumbs/*.webp` straight into `public/`. You review the diff and commit.
+- Otherwise (Chrome/Edge): the File System Access API, picking the repo's `public/` folder once.
+- Last resort: download a `.zip` with the same layout to unzip into `public/`.
 - Edits are also autosaved to `localStorage` so a page reload doesn't lose work; a "Discard local edits" button (click twice) reloads from `stops.json`. Local edits only load with `?dev=1`; visitors always get the committed `stops.json`.
 - "Re-render all thumbnails" (under More) recaptures every stop from its saved pose, e.g. after re-preparing the model.
 - On export, stop ids are renumbered to match the order and thumbnails of deleted stops are removed from `thumbs/`.
@@ -224,7 +224,7 @@ Ask Claude Code to work through these one at a time and stop for your review aft
    - Done when: every route to a stop (button, key, hash) lands on the same pose.
 4. **Camera transitions.** Eased flights, arc for long moves, interruptible, reduced-motion fallback.
    - Done when: rapid Next presses never snap, stall or flip the camera.
-5. **Carousel.** Side rail with cards, active state, wheel snapping with delay, scroll-into-view.
+5. **Carousel.** 3D drum of title-only cards, active state, wheel/drag physics with select-on-settle, tap to select.
    - Done when: scrolling the rail and pressing Next stay in sync.
 6. **Idle drift + user takeover.** Sway/orbit per stop, stops on input, "Back to view".
    - Done when: drift never fights the user's mouse.

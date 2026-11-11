@@ -1,4 +1,4 @@
-import { isTyping, type Carousel } from './carousel';
+import { isTyping, type Carousel, type Nav } from './carousel';
 import { type Drift, type Stop, type Tour, serializeTour, thumbPath } from './tour';
 import { type ThumbStore, clearLocalEdits, saveLocalEdits } from './thumbs';
 import type { Pose, Viewer } from './viewer';
@@ -27,6 +27,7 @@ interface DevContext {
   tour: Tour;
   viewer: Viewer;
   carousel: Carousel;
+  nav: Nav;
   thumbs: ThumbStore;
   ui: HTMLElement;
   /** Shown once in the status line, e.g. "Restored local edits from …". */
@@ -41,7 +42,7 @@ const roundPose = (p: Pose): Pose => ({
 });
 
 export function initDevMode(ctx: DevContext): void {
-  const { tour, viewer, carousel, thumbs, ui } = ctx;
+  const { tour, viewer, carousel, nav, thumbs, ui } = ctx;
   document.body.classList.add('is-dev');
 
   // ---------------------------------------------------------------- HUD
@@ -129,8 +130,8 @@ export function initDevMode(ctx: DevContext): void {
   const editor = document.createElement('div');
   editor.className = 'dev-editor';
   editor.innerHTML = `
-    <label>Title <input type="text" maxlength="40" data-e="title" /></label>
-    <label>Description <textarea rows="4" maxlength="300" data-e="desc"></textarea></label>
+    <div class="dev-editor__head" data-e="head"></div>
+    <label>Title <input type="text" maxlength="30" data-e="title" placeholder="e.g. Five stamp mill" /></label>
     <div class="dev-editor__row">
       <label>Drift
         <select data-e="drift">
@@ -147,34 +148,31 @@ export function initDevMode(ctx: DevContext): void {
       <button class="dev-btn" data-e="cancel" type="button">Cancel</button>
     </div>`;
   const titleIn = editor.querySelector<HTMLInputElement>('[data-e="title"]')!;
-  const descIn = editor.querySelector<HTMLTextAreaElement>('[data-e="desc"]')!;
+  const headEl = editor.querySelector<HTMLElement>('[data-e="head"]')!;
   const driftIn = editor.querySelector<HTMLSelectElement>('[data-e="drift"]')!;
   const confirmRow = editor.querySelector<HTMLElement>('.dev-editor__confirm')!;
   const deleteBtn = editor.querySelector<HTMLButtonElement>('[data-e="delete"]')!;
 
+  // The stop editor lives in the HUD, under the camera readout.
+  hud.querySelector('.dev-hud__pose')!.after(editor);
   const mountEditor = () => {
-    const card = carousel.card(tour.index);
-    if (!card) return;
+    if (tour.index < 0) return;
     const stop = tour.stop;
-    titleIn.value = stop.title;
-    descIn.value = stop.description;
+    headEl.textContent = `Stop ${tour.index + 1} of ${tour.count}`;
+    if (titleIn.value !== stop.title) titleIn.value = stop.title;
     driftIn.value = stop.drift ?? 'sway';
     confirmRow.hidden = true;
     deleteBtn.disabled = tour.count <= 1;
-    card.querySelector('.card__more-inner')!.prepend(editor);
   };
   tour.onChange(mountEditor);
   tour.onStopsChanged(mountEditor);
 
-  const liveText = (field: 'title' | 'description', value: string) => {
-    tour.stop[field] = value;
-    const card = carousel.card(tour.index);
-    const el = card?.querySelector(field === 'title' ? '.card__title' : '.card__desc');
-    if (el) el.textContent = value;
+  titleIn.addEventListener('input', () => {
+    tour.stop.title = titleIn.value;
+    carousel.setTitle(tour.index, titleIn.value);
+    nav.refresh();
     autosave();
-  };
-  titleIn.addEventListener('input', () => liveText('title', titleIn.value));
-  descIn.addEventListener('input', () => liveText('description', descIn.value));
+  });
   driftIn.addEventListener('change', () => {
     tour.stop.drift = driftIn.value as Drift;
     autosave();
@@ -219,7 +217,6 @@ export function initDevMode(ctx: DevContext): void {
       const stop: Stop = {
         id: '',
         title: 'New stop',
-        description: '',
         camera: roundPose(viewer.getPose()),
         thumbnail: '',
         drift: 'sway',
@@ -322,6 +319,13 @@ export function initDevMode(ctx: DevContext): void {
     try {
       status('Exporting…', 'busy');
       const files = await collectFiles();
+      // 1. Local dev server: write straight into public/ (no folder picker needed).
+      if (await saveViaDevServer(files)) {
+        const n = files.length - 1;
+        status(`Saved stops.json and ${n} thumbnail${n === 1 ? '' : 's'} to public/. Review the diff and commit.`);
+        return;
+      }
+      // 2. Chrome/Edge: write into a folder the user picks. 3. Anything else: a zip download.
       if ('showDirectoryPicker' in window) {
         try {
           const dir = await publicDir();
@@ -400,6 +404,22 @@ export function initDevMode(ctx: DevContext): void {
 }
 
 // -------------------------------------------------------------------- File System Access
+
+/** Writes via the Vite dev server's /__dev endpoints; false if they aren't there. */
+async function saveViaDevServer(files: { path: string; blob: Blob }[]): Promise<boolean> {
+  const endpoint = (p: string) => `/__dev/${p}`;
+  try {
+    for (const f of files) {
+      const res = await fetch(`${endpoint('save')}?path=${encodeURIComponent(f.path)}`, { method: 'POST', body: f.blob });
+      if (!res.ok) return false;
+    }
+    const keep = files.filter((f) => f.path.startsWith('thumbs/')).map((f) => f.path.slice('thumbs/'.length));
+    await fetch(endpoint('prune-thumbs'), { method: 'POST', body: JSON.stringify(keep) });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 class WrongFolderError extends Error {}
 
