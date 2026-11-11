@@ -88,6 +88,9 @@ export interface Carousel {
   render(): void;
   /** The card element for a stop index. */
   card(index: number): HTMLElement | undefined;
+  /** Shows "Back to view" on the active card once the user has moved the camera themselves. */
+  setTakenOver(takenOver: boolean): void;
+  onBackToView(fn: () => void): void;
 }
 
 /**
@@ -105,6 +108,7 @@ export function createCarousel(tour: Tour, root: HTMLElement, opts: CarouselOpti
   root.appendChild(rail);
 
   let cards: HTMLElement[] = [];
+  const backListeners: (() => void)[] = [];
 
   const render = () => {
     list.replaceChildren();
@@ -122,7 +126,12 @@ export function createCarousel(tour: Tour, root: HTMLElement, opts: CarouselOpti
         </div>
         <div class="card__more"><div class="card__more-inner">
           <p class="card__desc"></p>
-          <div class="card__actions"></div>
+          <div class="card__actions">
+            <button class="card__back" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 0 1 0 10h-3"/></svg>
+              Back to view
+            </button>
+          </div>
         </div></div>`;
       li.querySelector('.card__title')!.textContent = stop.title;
       li.querySelector('.card__desc')!.textContent = stop.description;
@@ -140,6 +149,9 @@ export function createCarousel(tour: Tour, root: HTMLElement, opts: CarouselOpti
           tour.goTo(i);
         }
       });
+      const back = li.querySelector<HTMLButtonElement>('.card__back')!;
+      back.addEventListener('mousedown', (e) => e.preventDefault());
+      back.addEventListener('click', () => backListeners.forEach((fn) => fn()));
       list.appendChild(li);
       return li;
     });
@@ -220,5 +232,11 @@ export function createCarousel(tour: Tour, root: HTMLElement, opts: CarouselOpti
   });
 
   render();
-  return { el: rail, render, card: (i) => cards[i] };
+  return {
+    el: rail,
+    render,
+    card: (i) => cards[i],
+    setTakenOver: (on) => rail.classList.toggle('is-taken-over', on),
+    onBackToView: (fn) => backListeners.push(fn),
+  };
 }

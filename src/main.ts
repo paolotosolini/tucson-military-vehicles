@@ -1,6 +1,6 @@
 import './styles.css';
-import { createCarousel, createNav } from './carousel';
-import { Tour, loadTour } from './tour';
+import { type Carousel, createCarousel, createNav, isTyping } from './carousel';
+import { type Stop, Tour, loadTour } from './tour';
 import { Viewer, type Pose } from './viewer';
 
 const base = import.meta.env.BASE_URL;
@@ -21,7 +21,7 @@ async function start() {
 
     // UI is built straight away (the carousel's thumbnails can load while the model streams).
     createNav(tour, ui);
-    createCarousel(tour, ui, { thumbUrl: (stop) => `${base}${stop.thumbnail}` });
+    const carousel = createCarousel(tour, ui, { thumbUrl: (stop) => `${base}${stop.thumbnail}` });
     ui.classList.add('is-ready');
 
     const startStop = tour.stops[tour.startIndex()];
@@ -35,7 +35,7 @@ async function start() {
       },
     });
 
-    wireTransitions(tour, viewer, canvas);
+    wireTransitions(tour, viewer, canvas, carousel);
     tour.start();
 
     loader.classList.add('is-done');
@@ -53,34 +53,57 @@ async function start() {
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const FADE_MS = 150; // each half of the 300 ms reduced-motion cross-fade
 
-/** Stop changes fly the camera (or fade, with reduced motion); user input cancels a flight. */
-function wireTransitions(tour: Tour, viewer: Viewer, canvas: HTMLCanvasElement) {
+/**
+ * Stop changes fly the camera (or fade, with reduced motion), then start the stop's idle drift.
+ * Any input on the canvas stops the motion and hands control to the user; the active card then
+ * offers "Back to view".
+ */
+function wireTransitions(tour: Tour, viewer: Viewer, canvas: HTMLCanvasElement, carousel: Carousel) {
   const fade = document.getElementById('fade')!;
   let fadeToken = 0;
 
-  const fadeTo = async (pose: Pose) => {
+  /** Resolves true once the new view is showing, or false if a newer selection took over. */
+  const fadeTo = async (pose: Pose): Promise<boolean> => {
     const token = ++fadeToken;
     fade.classList.add('is-on');
     await new Promise((r) => setTimeout(r, FADE_MS));
-    if (token !== fadeToken) return; // a newer selection took over
+    if (token !== fadeToken) return false;
     viewer.setPose(pose);
     // Give the new view a frame to render before revealing it.
     requestAnimationFrame(() => requestAnimationFrame(() => fade.classList.remove('is-on')));
+    return true;
   };
 
-  tour.onChange(({ stop, initial }) => {
-    if (initial) viewer.setPose(stop.camera);
-    else if (reducedMotion.matches) fadeTo(stop.camera);
-    else viewer.flyTo(stop.camera);
-  });
+  const arrive = (stop: Stop) => {
+    if (tour.stop !== stop) return; // the user has moved on
+    if (!reducedMotion.matches) viewer.startDrift(stop.drift ?? 'sway', stop.camera);
+  };
 
-  // Any direct camera input during a flight hands control to the user at the current view.
-  const interrupt = () => viewer.interruptFlight();
-  canvas.addEventListener('pointerdown', interrupt, true);
-  canvas.addEventListener('wheel', interrupt, { capture: true, passive: true });
+  const showStop = async (stop: Stop, instant: boolean) => {
+    carousel.setTakenOver(false);
+    if (instant) {
+      viewer.setPose(stop.camera);
+      arrive(stop);
+    } else if (reducedMotion.matches) {
+      if (await fadeTo(stop.camera)) arrive(stop);
+    } else if ((await viewer.flyTo(stop.camera)) === 'arrived') {
+      arrive(stop);
+    }
+  };
+
+  tour.onChange(({ stop, initial }) => showStop(stop, initial));
+  carousel.onBackToView(() => showStop(tour.stop, false));
+
+  // Any direct camera input hands control to the user at the current view.
+  const takeOver = () => {
+    viewer.takeOver();
+    carousel.setTakenOver(true);
+  };
+  canvas.addEventListener('pointerdown', takeOver, true);
+  canvas.addEventListener('wheel', takeOver, { capture: true, passive: true });
   const flyKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE']);
   window.addEventListener('keydown', (e) => {
-    if (flyKeys.has(e.code) && !e.metaKey && !e.ctrlKey) interrupt();
+    if (flyKeys.has(e.code) && !e.metaKey && !e.ctrlKey && !isTyping(e.target)) takeOver();
   });
 }
 

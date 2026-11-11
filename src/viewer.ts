@@ -42,6 +42,22 @@ interface ControlsInternals {
 /** How a flight ended. */
 export type FlightResult = 'arrived' | 'replaced' | 'interrupted';
 
+export type DriftKind = 'orbit' | 'sway' | 'none';
+
+const SWAY_DEGREES = 3.5; // peak yaw either side of the saved view
+const SWAY_PERIOD = 8; // seconds for one full side-to-side cycle
+const ORBIT_DEG_PER_SEC = 3; // one revolution every two minutes
+const DRIFT_RAMP = 2.5; // seconds to ease into the motion
+const smoothstep = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+
+interface DriftState {
+  kind: 'orbit' | 'sway';
+  offset: Vec3; // camera position relative to the target at the saved pose
+  target: Vec3;
+  fov: number;
+  t: number;
+}
+
 export interface ViewerOptions {
   canvas: HTMLCanvasElement;
   modelUrl: string;
@@ -64,12 +80,16 @@ export class Viewer {
   private readonly state: FlightState = { position: new Vec3(), target: new Vec3(), fov: 60 };
   private readonly velocity = { position: new Vec3(), target: new Vec3() };
   private readonly prev = { position: new Vec3(), target: new Vec3() };
+  private drift: DriftState | null = null;
 
   private constructor(app: AppBase, camera: Entity, controls: CameraControls) {
     this.app = app;
     this.camera = camera;
     this.controls = controls;
-    app.on('update', (dt: number) => this.updateFlight(dt));
+    app.on('update', (dt: number) => {
+      this.updateFlight(dt);
+      this.updateDrift(dt);
+    });
   }
 
   static async create(opts: ViewerOptions): Promise<Viewer> {
@@ -201,6 +221,7 @@ export class Viewer {
 
   /** Jumps the camera to a pose instantly and leaves the user in orbit mode around its target. */
   setPose(pose: Pose): void {
+    this.drift = null;
     this.endFlight('replaced');
     this.handOver(new Vec3(...pose.position), new Vec3(...pose.target), pose.fov);
   }
@@ -237,6 +258,7 @@ export class Viewer {
     const velocity = this.flight ? this.velocity : { position: Vec3.ZERO, target: Vec3.ZERO };
     const flight = new Flight(from, velocity, pose);
     this.endFlight('replaced');
+    this.drift = null;
 
     this.flight = flight;
     this.prev.position.copy(from.position);
@@ -246,12 +268,69 @@ export class Viewer {
     });
   }
 
-  /** Stops a flight where it is and gives the camera back to the user (e.g. on mouse input). */
-  interruptFlight(): void {
-    if (!this.flight) return;
-    const { position, target, fov } = this.state;
-    this.endFlight('interrupted');
-    this.handOver(position.clone(), target.clone(), fov);
+  /** True while the camera is moving on its own (flight or idle drift). */
+  get isAutomatic(): boolean {
+    return this.flight !== null || this.drift !== null;
+  }
+
+  /**
+   * The user touched the camera: stop any flight or drift exactly where it is and hand control
+   * over. Returns true if something automatic was stopped.
+   */
+  takeOver(): boolean {
+    if (this.flight) {
+      const { position, target, fov } = this.state;
+      this.endFlight('interrupted');
+      this.handOver(position.clone(), target.clone(), fov);
+      return true;
+    }
+    if (this.drift) {
+      const target = this.drift.target.clone();
+      const fov = this.drift.fov;
+      this.drift = null;
+      this.handOver(this.camera.getPosition().clone(), target, fov);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Starts idle motion around `pose` (normally right after arriving there): `sway` rocks the view
+   * a few degrees side to side, `orbit` circles slowly around the target. Both ease in from rest.
+   */
+  startDrift(kind: DriftKind, pose: Pose): void {
+    this.drift = null;
+    if (kind === 'none' || this.flight) return;
+    const target = new Vec3(...pose.target);
+    this.drift = {
+      kind,
+      target,
+      offset: new Vec3(...pose.position).sub(target),
+      fov: pose.fov,
+      t: 0,
+    };
+  }
+
+  private readonly driftPos = new Vec3();
+  private updateDrift(dt: number): void {
+    const d = this.drift;
+    if (!d || this.flight) return;
+    d.t += dt;
+    let yawDeg: number;
+    if (d.kind === 'sway') {
+      yawDeg = SWAY_DEGREES * Math.sin((2 * Math.PI * d.t) / SWAY_PERIOD) * smoothstep(d.t / DRIFT_RAMP);
+    } else {
+      // Speed ramps linearly to full over DRIFT_RAMP; this is its integral.
+      const r = DRIFT_RAMP;
+      yawDeg = ORBIT_DEG_PER_SEC * (d.t < r ? (d.t * d.t) / (2 * r) : d.t - r / 2);
+    }
+    const a = (yawDeg * Math.PI) / 180;
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
+    const { x, y, z } = d.offset;
+    this.driftPos.set(d.target.x + x * cos + z * sin, d.target.y + y, d.target.z - x * sin + z * cos);
+    this.camera.setPosition(this.driftPos);
+    this.camera.lookAt(d.target);
   }
 
   private updateFlight(dt: number): void {
