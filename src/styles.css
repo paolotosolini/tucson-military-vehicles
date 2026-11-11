@@ -116,3 +116,15 @@ html, body {
 .nav__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .nav__btn:disabled { opacity: 0.3; cursor: default; }
 .nav__btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Reduced-motion transition: a quick dip instead of a camera flight. */
+.fade {
+  position: fixed;
+  inset: 0;
+  background: #17120e;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+  z-index: 4; /* above the canvas, below the tour UI */
+}
+.fade.is-on { opacity: 1; }

@@ -49,6 +49,10 @@ export function createNav(tour: Tour, root: HTMLElement): HTMLElement {
   nextBtn.addEventListener('click', () => tour.next());
   homeBtn.addEventListener('click', () => tour.home());
 
+  // Mouse clicks shouldn't leave focus (and a focus ring) on the buttons, or later key presses
+  // would show it. Keyboard users can still Tab to them.
+  for (const btn of [prevBtn, nextBtn, homeBtn]) btn.addEventListener('mousedown', (e) => e.preventDefault());
+
   const render = () => {
     counter.textContent = `${tour.index + 1} / ${tour.count}`;
     homeBtn.disabled = tour.isHome;

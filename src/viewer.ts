@@ -21,6 +21,7 @@ import {
   createGraphicsDevice,
 } from 'playcanvas';
 import { CameraControls } from 'playcanvas/scripts/esm/camera-controls.mjs';
+import { Flight, type FlightState } from './flight';
 
 export interface Pose {
   position: [number, number, number];
@@ -31,6 +32,15 @@ export interface Pose {
 interface PoseLike {
   copy(other: PoseLike): unknown;
 }
+
+/** The parts of CameraControls' private state the viewer needs to sync with. */
+interface ControlsInternals {
+  _controller: { _rootPose: PoseLike; _targetRootPose: PoseLike; _childPose: PoseLike; _targetChildPose: PoseLike };
+  _pose: { look(from: Vec3, to: Vec3): unknown; getFocus(out: Vec3): Vec3 };
+}
+
+/** How a flight ended. */
+export type FlightResult = 'arrived' | 'replaced' | 'interrupted';
 
 export interface ViewerOptions {
   canvas: HTMLCanvasElement;
@@ -48,10 +58,18 @@ export class Viewer {
   readonly controls: CameraControls;
   private splat: Entity | null = null;
 
+  // Flight state
+  private flight: Flight | null = null;
+  private settleFlight: ((r: FlightResult) => void) | null = null;
+  private readonly state: FlightState = { position: new Vec3(), target: new Vec3(), fov: 60 };
+  private readonly velocity = { position: new Vec3(), target: new Vec3() };
+  private readonly prev = { position: new Vec3(), target: new Vec3() };
+
   private constructor(app: AppBase, camera: Entity, controls: CameraControls) {
     this.app = app;
     this.camera = camera;
     this.controls = controls;
+    app.on('update', (dt: number) => this.updateFlight(dt));
   }
 
   static async create(opts: ViewerOptions): Promise<Viewer> {
@@ -183,9 +201,94 @@ export class Viewer {
 
   /** Jumps the camera to a pose instantly and leaves the user in orbit mode around its target. */
   setPose(pose: Pose): void {
-    const position = new Vec3(...pose.position);
-    const target = new Vec3(...pose.target);
-    this.camera.camera!.fov = pose.fov;
+    this.endFlight('replaced');
+    this.handOver(new Vec3(...pose.position), new Vec3(...pose.target), pose.fov);
+  }
+
+  /** The camera's current position, look-at target (orbit pivot) and FOV. */
+  getPose(): Pose {
+    const p = this.camera.getPosition();
+    const t = this.flight
+      ? this.state.target
+      : (this.controls as unknown as ControlsInternals)._pose.getFocus(new Vec3());
+    return { position: [p.x, p.y, p.z], target: [t.x, t.y, t.z], fov: this.camera.camera!.fov };
+  }
+
+  get isFlying(): boolean {
+    return this.flight !== null;
+  }
+
+  /**
+   * Flies from wherever the camera is now to `pose`. A flight already under way is replaced, and
+   * the new one starts from the camera's current position and velocity, so rapid selections
+   * never snap or stall.
+   *
+   * CameraControls keeps running during a flight; this viewer's app 'update' handler fires after
+   * script updates, so the flight simply overrides the camera each frame. (Disabling the script
+   * instead is a trap: re-enabling discards pending key events but not its running key state, so a
+   * key released mid-flight leaves the camera drifting forever.)
+   */
+  flyTo(pose: Pose): Promise<FlightResult> {
+    const from: FlightState = {
+      position: this.camera.getPosition().clone(),
+      target: new Vec3(...this.getPose().target),
+      fov: this.camera.camera!.fov,
+    };
+    const velocity = this.flight ? this.velocity : { position: Vec3.ZERO, target: Vec3.ZERO };
+    const flight = new Flight(from, velocity, pose);
+    this.endFlight('replaced');
+
+    this.flight = flight;
+    this.prev.position.copy(from.position);
+    this.prev.target.copy(from.target);
+    return new Promise((resolve) => {
+      this.settleFlight = resolve;
+    });
+  }
+
+  /** Stops a flight where it is and gives the camera back to the user (e.g. on mouse input). */
+  interruptFlight(): void {
+    if (!this.flight) return;
+    const { position, target, fov } = this.state;
+    this.endFlight('interrupted');
+    this.handOver(position.clone(), target.clone(), fov);
+  }
+
+  private updateFlight(dt: number): void {
+    const flight = this.flight;
+    if (!flight) return;
+    const st = flight.step(dt, this.state);
+
+    if (dt > 0) {
+      this.velocity.position.sub2(st.position, this.prev.position).mulScalar(1 / dt);
+      this.velocity.target.sub2(st.target, this.prev.target).mulScalar(1 / dt);
+    }
+    this.prev.position.copy(st.position);
+    this.prev.target.copy(st.target);
+
+    this.camera.setPosition(st.position);
+    this.camera.lookAt(st.target);
+    this.camera.camera!.fov = st.fov;
+
+    if (flight.done) {
+      this.endFlight('arrived');
+      this.handOver(st.position.clone(), st.target.clone(), st.fov);
+    }
+  }
+
+  private endFlight(result: FlightResult): void {
+    if (!this.flight) return;
+    this.flight = null;
+    this.velocity.position.set(0, 0, 0);
+    this.velocity.target.set(0, 0, 0);
+    const settle = this.settleFlight;
+    this.settleFlight = null;
+    settle?.(result);
+  }
+
+  /** Places the camera and syncs CameraControls so the user continues from exactly this view. */
+  private handOver(position: Vec3, target: Vec3, fov: number): void {
+    this.camera.camera!.fov = fov;
     this.camera.setPosition(position);
     this.camera.lookAt(target);
 
@@ -193,10 +296,7 @@ export class Viewer {
     // controller, and update the cached pose it hands to the orbit controller afterwards.
     const controls = this.controls;
     controls.reset(target, position);
-    const internal = controls as unknown as {
-      _controller: { _rootPose: PoseLike; _targetRootPose: PoseLike; _childPose: PoseLike; _targetChildPose: PoseLike };
-      _pose: { look(from: Vec3, to: Vec3): unknown };
-    };
+    const internal = controls as unknown as ControlsInternals;
     const c = internal._controller;
     c._rootPose.copy(c._targetRootPose);
     c._childPose.copy(c._targetChildPose);

@@ -166,6 +166,7 @@ The splat fills the window; the carousel is a translucent rail on the right, abo
 - Fly from the current pose to the stop's pose in 1.5–2.5 s, duration scaled by distance, ease-in-out.
 - Interpolate the target and position separately so the view turns smoothly. If the straight path is long (over \~15 units), arc upward along the way to avoid passing through buildings.
 - A new selection mid-flight starts from wherever the camera is now.
+- Mouse drag, wheel or a fly key (WASD/QE) during a flight stops it where it is and hands control to the user; the stop stays selected.
 - Respect `prefers-reduced-motion`: replace the flight with a 300 ms cross-fade.
 
 **Idle drift**
