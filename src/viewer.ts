@@ -28,6 +28,10 @@ export interface Pose {
   fov: number;
 }
 
+interface PoseLike {
+  copy(other: PoseLike): unknown;
+}
+
 export interface ViewerOptions {
   canvas: HTMLCanvasElement;
   modelUrl: string;
@@ -80,7 +84,7 @@ export class Viewer {
     window.addEventListener('resize', applyResolution);
 
     // Camera with orbit + fly controls
-    const { position, target, fov } = opts.initialPose;
+    const { position, fov } = opts.initialPose;
     const camera = new Entity('camera');
     camera.addComponent('camera', {
       clearColor: new Color(0.73, 0.78, 0.82),
@@ -103,7 +107,6 @@ export class Viewer {
       enableFly: true,
       enablePan: true,
     });
-    controls.reset(new Vec3(...target), new Vec3(...position));
 
     // Streaming / LOD settings
     const gs = app.scene.gsplat;
@@ -116,6 +119,7 @@ export class Viewer {
     if (opts.showStats) new MiniStats(app);
 
     const viewer = new Viewer(app, camera, controls);
+    viewer.setPose(opts.initialPose);
     await viewer.loadSplat(opts.modelUrl, opts.onProgress);
     return viewer;
   }
@@ -175,6 +179,28 @@ export class Viewer {
       };
       system.on('frame:ready', onFrameReady);
     });
+  }
+
+  /** Jumps the camera to a pose instantly and leaves the user in orbit mode around its target. */
+  setPose(pose: Pose): void {
+    const position = new Vec3(...pose.position);
+    const target = new Vec3(...pose.target);
+    this.camera.camera!.fov = pose.fov;
+    this.camera.setPosition(position);
+    this.camera.lookAt(target);
+
+    // CameraControls.reset() eases towards the pose; skip the easing by snapping its focus
+    // controller, and update the cached pose it hands to the orbit controller afterwards.
+    const controls = this.controls;
+    controls.reset(target, position);
+    const internal = controls as unknown as {
+      _controller: { _rootPose: PoseLike; _targetRootPose: PoseLike; _childPose: PoseLike; _targetChildPose: PoseLike };
+      _pose: { look(from: Vec3, to: Vec3): unknown };
+    };
+    const c = internal._controller;
+    c._rootPose.copy(c._targetRootPose);
+    c._childPose.copy(c._targetChildPose);
+    internal._pose.look(position, target);
   }
 
   get splatEntity(): Entity | null {

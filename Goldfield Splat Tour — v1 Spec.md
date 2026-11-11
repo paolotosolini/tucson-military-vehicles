@@ -9,10 +9,10 @@ v1 is a desktop web page that shows the Goldfield Gaussian splat full-screen wit
 **In scope**
 
 - Full-screen splat viewer with free orbit/fly controls
-- Stop 0: an overview of the whole scanned area with the tour title
-- Stops 1–N: placeholder text ("Stop 1" / "Description 1"), editable later
+- Stop 1: an overview of the whole scanned area with the tour title
+- Stops 2–N: placeholder text ("Stop 2" / "Description 2"), editable later
 - Vertical carousel on the right with a thumbnail, title and description per card
-- Previous / Next buttons and arrow keys
+- Previous / Next buttons and arrow keys (looping), Home button back to the overview
 - Smooth camera move between stops, slow idle drift at each stop
 - Deep link per stop (`#stop-3`)
 - Dev mode to capture poses, type text, and export `stops.json` + thumbnails
@@ -39,7 +39,7 @@ Claude - 3DGS/            # working folder = git repo root
 ├── public/
 │   ├── model/           # prepared Streamed SOG (output of Step 0)
 │   ├── stops.json
-│   └── thumbs/          # stop-0.webp, stop-1.webp, ...
+│   └── thumbs/          # stop-1.webp, stop-2.webp, ...
 ├── tools/
 │   └── prepare-model.sh # splat-transform commands, reproducible
 └── .github/workflows/deploy.yml
@@ -74,7 +74,7 @@ splat-transform \
   --filter-nan --filter-harmonics 1
 ```
 
-Treat these numbers as a starting point. Claude Code should put the commands in `tools/prepare-model.sh` and try `--filter-harmonics` at 0, 1 and 2, then report total size and largest file for each. `--decimate-adaptive` may give better results on scenes with sky.
+Treat these numbers as a starting point. Claude Code should put the commands in `tools/prepare-model.sh` and report total size and largest file. (The Goldfield scan has no higher-order spherical harmonics, so `--filter-harmonics 0` is lossless and the 0/1/2 comparison doesn't apply.) `--decimate-adaptive` may give better results on scenes with sky.
 
 **Fallback:** if streaming is too complex for v1, write one decimated, unbundled SOG instead (`-d 25%`, then output `public/model/meta.json`). Aim for about 50 MB total.
 
@@ -84,7 +84,7 @@ Treat these numbers as a starting point. Claude Code should put the commands in 
 
 ## Stops data format
 
-All tour content lives in `public/stops.json`. The app reads it on load; dev mode writes a new copy for you to commit. Stop 0 is always the overview.
+All tour content lives in `public/stops.json`. The app reads it on load; dev mode writes a new copy for you to commit. Stop 1 (the first entry) is always the overview.
 
 ```json
 {
@@ -93,7 +93,7 @@ All tour content lives in `public/stops.json`. The app reads it on load; dev mod
   "model": "model/lod-meta.json",
   "stops": [
     {
-      "id": "stop-0",
+      "id": "stop-1",
       "title": "Goldfield Ghost Town",
       "description": "Overview of the scanned area.",
       "camera": {
@@ -101,15 +101,15 @@ All tour content lives in `public/stops.json`. The app reads it on load; dev mod
         "target":   [0.0, 1.2, 0.0],
         "fov": 60
       },
-      "thumbnail": "thumbs/stop-0.webp",
+      "thumbnail": "thumbs/stop-1.webp",
       "drift": "orbit"
     },
     {
-      "id": "stop-1",
-      "title": "Stop 1",
-      "description": "Description 1",
+      "id": "stop-2",
+      "title": "Stop 2",
+      "description": "Description 2",
       "camera": { "position": [3.2, 1.7, 4.5], "target": [1.0, 1.5, 0.8], "fov": 55 },
-      "thumbnail": "thumbs/stop-1.webp",
+      "thumbnail": "thumbs/stop-2.webp",
       "drift": "sway"
     }
   ]
@@ -118,7 +118,7 @@ All tour content lives in `public/stops.json`. The app reads it on load; dev mod
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `id` | string | Used for the deep link (`#stop-1`) and thumbnail filename |
+| `id` | string | Used for the deep link (`#stop-2`) and thumbnail filename |
 | `title` | string | Card heading, max \~40 characters |
 | `description` | string | 1–3 sentences, max \~300 characters |
 | `camera.position` | \[x, y, z\] | World units of the splat |
@@ -143,7 +143,7 @@ The splat fills the window; the carousel is a translucent rail on the right, abo
 |                                            |  Stop 2     |    (expanded,
 |                                            |  Desc ...   |     accent border)
 |                                            |-------------|
-|  Goldfield Ghost Town          [<] 2/10 [>] |  [ thumb ]  |
+| [⌂] Goldfield Ghost Town      [<] 2/10 [>] |  [ thumb ]  |
 +--------------------------------------------+-------------+
 ```
 
@@ -155,8 +155,10 @@ The splat fills the window; the carousel is a translucent rail on the right, abo
 
 **Navigation**
 
-- Previous / Next buttons with a counter ("2 / 10"; the overview counts as 1) bottom-left of the canvas. Disabled at the ends; no wrap-around.
-- Left/Right and Up/Down arrow keys do the same; ignored while typing in a text field.
+- Previous / Next buttons with a counter ("2 / 10"; the overview counts as 1) bottom-left of the canvas. They loop: Next on the last stop returns to stop 1, and Previous on stop 1 goes to the last stop.
+- A Home button at the left of the bar returns to stop 1 (disabled while on stop 1). The `Home` key does the same.
+- Left/Right and Up/Down arrow keys do the same as Previous / Next; ignored while typing in a text field.
+- Stop ids run `stop-1` … `stop-10`, so the deep link matches the counter.
 - URL hash updates on each stop change (`#stop-3`). Loading a URL with a hash starts at that stop without the flight.
 
 **Camera transitions**
@@ -168,7 +170,7 @@ The splat fills the window; the carousel is a translucent rail on the right, abo
 
 **Idle drift**
 
-- After arriving, start the stop's drift: `sway` = slow side-to-side movement of a few degrees around the target over \~8 s; `orbit` = slow continuous orbit (stop 0).
+- After arriving, start the stop's drift: `sway` = slow side-to-side movement of a few degrees around the target over \~8 s; `orbit` = slow continuous orbit (stop 1, the overview).
 - Any user input on the canvas stops the drift and hands control to the user. The active card stays selected; a "Back to view" button on the card returns to the saved pose.
 
 **Loading**

@@ -1,0 +1,127 @@
+{
+  "title": "Goldfield Ghost Town",
+  "subtitle": "Apache Junction, Arizona",
+  "model": "model/lod-meta.json",
+  "stops": [
+    {
+      "id": "stop-1",
+      "title": "Goldfield Ghost Town",
+      "description": "Overview of the scanned area.",
+      "camera": {
+        "position": [16, 12, 6],
+        "target": [-2, 0, -18],
+        "fov": 60
+      },
+      "thumbnail": "thumbs/stop-1.webp",
+      "drift": "orbit"
+    },
+    {
+      "id": "stop-2",
+      "title": "Stop 2",
+      "description": "Description 2",
+      "camera": {
+        "position": [11, 2.5, -18],
+        "target": [-1, 1.5, -18],
+        "fov": 60
+      },
+      "thumbnail": "thumbs/stop-2.webp",
+      "drift": "sway"
+    },
+    {
+      "id": "stop-3",
+      "title": "Stop 3",
+      "description": "Description 3",
+      "camera": {
+        "position": [8.19, 2.5, -10.29],
+        "target": [-1, 1.5, -18],
+        "fov": 60
+      },
+      "thumbnail": "thumbs/stop-3.webp",
+      "drift": "sway"
+    },
+    {
+      "id": "stop-4",
+      "title": "Stop 4",
+      "description": "Description 4",
+      "camera": {
+        "position": [1.08, 2.5, -6.18],
+        "target": [-1, 1.5, -18],
+        "fov": 60
+      },
+      "thumbnail": "thumbs/stop-4.webp",
+      "drift": "sway"
+    },
+    {
+      "id": "stop-5",
+      "title": "Stop 5",
+      "description": "Description 5",
+      "camera": {
+        "position": [-7, 2.5, -7.61],
+        "target": [-1, 1.5, -18],
+        "fov": 60
+      },
+      "thumbnail": "thumbs/stop-5.webp",
+      "drift": "sway"
+    },
+    {
+      "id": "stop-6",
+      "title": "Stop 6",
+      "description": "Description 6",
+      "camera": {
+        "position": [-12.28, 2.5, -13.9],
+        "target": [-1, 1.5, -18],
+        "fov": 60
+      },
+      "thumbnail": "thumbs/stop-6.webp",
+      "drift": "sway"
+    },
+    {
+      "id": "stop-7",
+      "title": "Stop 7",
+      "description": "Description 7",
+      "camera": {
+        "position": [-12.28, 2.5, -22.1],
+        "target": [-1, 1.5, -18],
+        "fov": 60
+      },
+      "thumbnail": "thumbs/stop-7.webp",
+      "drift": "sway"
+    },
+    {
+      "id": "stop-8",
+      "title": "Stop 8",
+      "description": "Description 8",
+      "camera": {
+        "position": [-7, 2.5, -28.39],
+        "target": [-1, 1.5, -18],
+        "fov": 60
+      },
+      "thumbnail": "thumbs/stop-8.webp",
+      "drift": "sway"
+    },
+    {
+      "id": "stop-9",
+      "title": "Stop 9",
+      "description": "Description 9",
+      "camera": {
+        "position": [1.08, 2.5, -29.82],
+        "target": [-1, 1.5, -18],
+        "fov": 60
+      },
+      "thumbnail": "thumbs/stop-9.webp",
+      "drift": "sway"
+    },
+    {
+      "id": "stop-10",
+      "title": "Stop 10",
+      "description": "Description 10",
+      "camera": {
+        "position": [8.19, 2.5, -25.71],
+        "target": [-1, 1.5, -18],
+        "fov": 60
+      },
+      "thumbnail": "thumbs/stop-10.webp",
+      "drift": "sway"
+    }
+  ]
+}
