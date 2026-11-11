@@ -149,3 +149,11 @@ export class Tour {
     for (const fn of this.listeners) fn({ index, previous, stop, initial });
   }
 }
+
+/** stops.json text as committed: 2-space JSON with coordinate arrays kept on one line. */
+export function serializeTour(data: TourData): string {
+  const json = JSON.stringify(data, null, 2);
+  return (
+    json.replace(/\[\s*(-?[\d.e+-]+),\s*(-?[\d.e+-]+),\s*(-?[\d.e+-]+)\s*\]/g, '[$1, $2, $3]') + '\n'
+  );
+}

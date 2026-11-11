@@ -1,10 +1,14 @@
 import './styles.css';
 import { type Carousel, createCarousel, createNav, isTyping } from './carousel';
+import { DEV_TOGGLE_KEY, initDevMode, isLocalhost, toggleDevMode } from './devmode';
+import { ThumbStore, loadLocalEdits } from './thumbs';
 import { type Stop, Tour, loadTour } from './tour';
 import { Viewer, type Pose } from './viewer';
 
 const base = import.meta.env.BASE_URL;
 const params = new URLSearchParams(location.search);
+/** Dev mode (tour authoring) is only ever on with ?dev=1. */
+const dev = params.get('dev') === '1';
 
 const loader = document.getElementById('loader')!;
 const fill = loader.querySelector<HTMLElement>('.loader__fill')!;
@@ -14,14 +18,20 @@ const ui = document.getElementById('ui')!;
 async function start() {
   const canvas = document.getElementById('app') as HTMLCanvasElement;
   try {
-    const data = await loadTour(`${base}stops.json`);
+    let data = await loadTour(`${base}stops.json`);
+    const thumbs = new ThumbStore(base);
+
+    // Dev mode resumes unexported edits saved in this browser.
+    const edits = dev ? loadLocalEdits() : null;
+    if (edits) data = edits.data;
     const tour = new Tour(data);
+    if (edits) await thumbs.restore(tour.stops, edits.thumbs);
     loader.querySelector('.loader__title')!.textContent = data.title;
     loader.querySelector('.loader__subtitle')!.textContent = data.subtitle;
 
     // UI is built straight away (the carousel's thumbnails can load while the model streams).
     createNav(tour, ui);
-    const carousel = createCarousel(tour, ui, { thumbUrl: (stop) => `${base}${stop.thumbnail}` });
+    const carousel = createCarousel(tour, ui, { thumbUrl: (stop) => thumbs.url(stop) });
     ui.classList.add('is-ready');
 
     const startStop = tour.stops[tour.startIndex()];
@@ -37,12 +47,23 @@ async function start() {
 
     wireTransitions(tour, viewer, canvas, carousel);
     tour.start();
+    if (dev) {
+      const when = edits ? new Date(edits.savedAt).toLocaleString() : '';
+      initDevMode({
+        tour,
+        viewer,
+        carousel,
+        thumbs,
+        ui,
+        initialStatus: edits ? `Restored local edits from ${when}.` : undefined,
+      });
+    }
 
     loader.classList.add('is-done');
     ui.classList.add('is-live');
     canvas.focus();
     // Handy for debugging in the console.
-    Object.assign(window, { viewer, tour });
+    Object.assign(window, { viewer, tour, thumbs });
   } catch (err) {
     console.error(err);
     loader.classList.add('is-error');
@@ -76,7 +97,8 @@ function wireTransitions(tour: Tour, viewer: Viewer, canvas: HTMLCanvasElement, 
 
   const arrive = (stop: Stop) => {
     if (tour.stop !== stop) return; // the user has moved on
-    if (!reducedMotion.matches) viewer.startDrift(stop.drift ?? 'sway', stop.camera);
+    // No idle drift while authoring: it would move the camera you're composing.
+    if (!reducedMotion.matches && !dev) viewer.startDrift(stop.drift ?? 'sway', stop.camera);
   };
 
   const showStop = async (stop: Stop, instant: boolean) => {
@@ -104,6 +126,14 @@ function wireTransitions(tour: Tour, viewer: Viewer, canvas: HTMLCanvasElement, 
   const flyKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE']);
   window.addEventListener('keydown', (e) => {
     if (flyKeys.has(e.code) && !e.metaKey && !e.ctrlKey && !isTyping(e.target)) takeOver();
+  });
+}
+
+// On localhost, the ` key switches dev mode on/off (reloads with or without ?dev=1).
+// (The spec suggested D, but D is also "strafe right" when flying with WASD.)
+if (isLocalhost()) {
+  window.addEventListener('keydown', (e) => {
+    if (e.key === DEV_TOGGLE_KEY && !isTyping(e.target) && !e.metaKey && !e.ctrlKey) toggleDevMode(!dev);
   });
 }
 

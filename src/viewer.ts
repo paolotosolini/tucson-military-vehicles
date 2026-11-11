@@ -382,6 +382,79 @@ export class Viewer {
     internal._pose.look(position, target);
   }
 
+  /**
+   * Resolves once the streamed LOD chunks the current view needs are loaded (or after
+   * `timeoutMs`, so a capture never hangs). Waits a few frames first so LOD selection catches up
+   * with a camera that just moved.
+   */
+  async waitForDetail(timeoutMs = 10000): Promise<void> {
+    const frames = (n: number) =>
+      new Promise<void>((r) => {
+        const tick = () => (--n <= 0 ? r() : this.app.once('frameend', tick));
+        this.app.once('frameend', tick);
+      });
+    await frames(3);
+    const system = this.app.systems.gsplat as unknown as {
+      on(name: string, cb: (...a: unknown[]) => void): void;
+      off(name: string, cb: (...a: unknown[]) => void): void;
+    };
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        system.off('frame:ready', onReady);
+        resolve();
+      };
+      const onReady = (...args: unknown[]) => {
+        if (args[2] === true && args[3] === 0) done();
+      };
+      const timer = setTimeout(done, timeoutMs);
+      system.on('frame:ready', onReady);
+    });
+    await frames(2);
+  }
+
+  /**
+   * Captures the current view as a 16:9 image (e.g. 640×360 WebP) with the camera's vertical
+   * FOV, whatever the window's shape: on a window taller than 16:9 the FOV is widened for the
+   * capture frame so the centre crop still spans the full FOV. Only the WebGL/WebGPU canvas is
+   * read, so DOM UI is never in the picture.
+   */
+  async captureImage(width = 640, height = 360, type = 'image/webp', quality = 0.8): Promise<Blob> {
+    const src = this.app.graphicsDevice.canvas as HTMLCanvasElement;
+    const cam = this.camera.camera!;
+    const aspect = width / height;
+    const nextFrame = () => new Promise<void>((r) => this.app.once('frameend', () => r()));
+
+    const fov = cam.fov;
+    const cropH = Math.min(src.height, src.width / aspect);
+    const widen = src.height / cropH; // > 1 when the window is taller than 16:9
+    if (widen > 1.001) {
+      const half = (fov * Math.PI) / 360;
+      cam.fov = (Math.atan(Math.tan(half) * widen) * 360) / Math.PI;
+      await nextFrame();
+    }
+    try {
+      // Read inside 'frameend': a WebGPU canvas is blank outside the frame that drew it.
+      const out = document.createElement('canvas');
+      out.width = width;
+      out.height = height;
+      await new Promise<void>((r) =>
+        this.app.once('frameend', () => {
+          const sw = cropH * aspect;
+          const g = out.getContext('2d')!;
+          g.imageSmoothingQuality = 'high';
+          g.drawImage(src, (src.width - sw) / 2, (src.height - cropH) / 2, sw, cropH, 0, 0, width, height);
+          r();
+        }),
+      );
+      return await new Promise<Blob>((resolve, reject) =>
+        out.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode image'))), type, quality),
+      );
+    } finally {
+      cam.fov = fov;
+    }
+  }
+
   get splatEntity(): Entity | null {
     return this.splat;
   }

@@ -180,11 +180,11 @@ The splat fills the window; the carousel is a translucent rail on the right, abo
 
 ## Dev mode
 
-Dev mode is how you author the tour: fly to a view, snap it, type the text, export. It turns on with `?dev=1` in the URL, or the `D` key on `localhost`. It is never shown to visitors unless the query flag is present.
+Dev mode is how you author the tour: fly to a view, snap it, type the text, export. It turns on with `?dev=1` in the URL, or the `` ` `` (backtick) key on `localhost`, which reloads the page with or without the flag. (`D` was the original idea, but it is also "strafe right" when flying.) It is never shown to visitors unless the query flag is present.
 
 **Controls**
 
-- Free-fly camera: WASD + mouse look, Q/E down/up, Shift for faster movement. Orbit mode stays available.
+- Free-fly camera: WASD + right-drag to look, Q/E down/up, Shift for faster movement. Left-drag orbit stays available. Idle drift is off in dev mode.
 - A HUD shows the live camera position, target and FOV, plus a FOV slider.
 - An edit panel replaces the card text for the active stop: title and description inputs, drift dropdown.
 
@@ -194,7 +194,7 @@ Dev mode is how you author the tour: fly to a view, snap it, type the text, expo
 | --- | --- | --- |
 | Snap pose | `Space` | Saves the current camera to the active stop and re-renders its thumbnail |
 | Add stop | `N` | Inserts a new stop after the active one, using the current pose |
-| Delete stop | `Del` | Removes the active stop after a confirm in the panel (no browser dialog) |
+| Delete stop | `Del` / `Backspace` | Removes the active stop after a confirm in the panel (no browser dialog) |
 | Reorder | `[` / `]` | Moves the active stop up or down |
 | Preview | `P` | Plays the transition into the active stop from the previous one |
 | Export | `Ctrl+S` | Saves `stops.json` and all thumbnails |
@@ -208,7 +208,9 @@ Dev mode is how you author the tour: fly to a view, snap it, type the text, expo
 
 - Preferred (Chrome/Edge): the File System Access API. The first export asks you to pick the repo's `public/` folder, then writes `stops.json` and `thumbs/*.webp` directly. You review the diff and commit.
 - Fallback: download a `.zip` with the same layout to unzip into `public/`.
-- Edits are also autosaved to `localStorage` so a page reload doesn't lose work; a "Discard local edits" button reloads from `stops.json`.
+- Edits are also autosaved to `localStorage` so a page reload doesn't lose work; a "Discard local edits" button (click twice) reloads from `stops.json`. Local edits only load with `?dev=1`; visitors always get the committed `stops.json`.
+- "Re-render all thumbnails" (under More) recaptures every stop from its saved pose, e.g. after re-preparing the model.
+- On export, stop ids are renumbered to match the order and thumbnails of deleted stops are removed from `thumbs/`.
 
 ## Build order
 
