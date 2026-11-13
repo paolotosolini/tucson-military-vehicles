@@ -168,7 +168,7 @@ export class Viewer {
    */
   private async loadSplat(url: string, onProgress?: (f: number) => void): Promise<void> {
     const app = this.app;
-    const asset = new Asset('goldfield', 'gsplat', { url });
+    const asset = new Asset('scan', 'gsplat', { url });
     app.assets.add(asset);
     await new Promise<void>((resolve, reject) => {
       asset.once('load', () => resolve());
@@ -179,9 +179,8 @@ export class Viewer {
 
     const splat = new Entity('splat');
     splat.addComponent('gsplat', { asset });
-    // The scan uses the common 3DGS y-down convention; turn it upright. All stop poses
-    // (stops.json) are in this upright world space.
-    splat.setLocalEulerAngles(0, 0, 180);
+    // No rotation here: tools/prepare-model.sh bakes the scan upright (Y-up), so stop poses in
+    // stops.json are plain world coordinates.
     app.root.addChild(splat);
     this.splat = splat;
 

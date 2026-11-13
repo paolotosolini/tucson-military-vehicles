@@ -1,23 +1,23 @@
-# Goldfield Splat Tour — v1 Spec
+# Tucson Military Vehicle Museum Tour — v1 Spec
 
-Nov 8, 2026 · @Paolo Tosolini
+Nov 8, 2026 (model replaced Nov 13, 2026) · @Paolo Tosolini
 
 ## Overview
 
-v1 is a desktop web page that shows the Goldfield Gaussian splat full-screen with a 3D drum carousel of 8–10 stops on the right. Selecting a stop flies the camera to a saved viewpoint; each stop is a thumbnail with a short title (no description text in v1). It is built with Claude Code and hosted on GitHub Pages.
+v1 is a desktop web page that shows a Gaussian splat scan of the Tucson Military Vehicle Museum hangar full-screen with a 3D drum carousel of 8–10 stops on the right. Selecting a stop flies the camera to a saved viewpoint; each stop is a thumbnail with a short title (no description text in v1). It is built with Claude Code and hosted on GitHub Pages.
 
 **In scope**
 
 - Full-screen splat viewer with free orbit/fly controls
-- Stop 1: an overview of the whole scanned area with the tour title
-- Stops 2–N: placeholder titles ("Stop 2"), editable later
+- Stop 1: an overview of the hangar
+- Stops 2–N: one per vehicle, titled with its name (e.g. "T-34/85"); placeholders until authored
 - Vertical 3D drum carousel on the right: one thumbnail per stop with its title over the image
 - Previous / Next buttons and arrow keys (looping), Home button back to the overview
 - Smooth camera move between stops, slow idle drift at each stop
 - Deep link per stop (`#stop-3`)
 - Dev mode to capture poses, type text, and export `stops.json` + thumbnails
 
-**Out of scope for v1:** mobile layout, audio, archival media, 1890s filter, gamification, hotspots placed in 3D, written history text.
+**Out of scope for v1:** mobile layout, audio, archival media, gamification, hotspots placed in 3D, written history text.
 
 ## Tech stack and repo structure
 
@@ -26,8 +26,10 @@ Use the PlayCanvas Engine with Vite and plain TypeScript, no UI framework. SOG i
 ```
 Claude - 3DGS/            # working folder = git repo root
 ├── source/               # NOT committed (.gitignore)
-│   ├── scene.ply         # original scan, input to Step 0
-│   └── lod1.ply ...      # intermediate decimated levels
+│   └── tucson/           # the scan exports (zips + unzipped)
+│       ├── ply/point_cloud/iteration_100/   # input to Step 0
+│       │     point_cloud.ply, point_cloud_1…5.ply, environment.ply
+│       └── lcc2/          # LCC2 export; info/poses.json = capture path
 ├── index.html
 ├── src/
 │   ├── main.ts          # app bootstrap, load splat, wire UI
@@ -45,40 +47,31 @@ Claude - 3DGS/            # working folder = git repo root
 └── .github/workflows/deploy.yml
 ```
 
-Move `scene.ply` from the folder root into `source/` before starting, and add `source/` to `.gitignore`. That keeps the large original and the intermediate LOD files out of Git; only the prepared output under `public/model/` is committed. The folder name contains spaces, so scripts must quote paths. The GitHub repo is `paolotosolini/goldfield` (public), which makes the site `paolotosolini.github.io/goldfield/` and Vite's `base` `/goldfield/`. All folder names are lowercase.
+`source/` is in `.gitignore`, which keeps the large originals out of Git; only the prepared output under `public/model/` is committed. The folder name contains spaces, so scripts must quote paths. The GitHub repo is `paolotosolini/tucson-military-vehicles` (public), which makes the site `paolotosolini.github.io/tucson-military-vehicles/` and Vite's `base` `/tucson-military-vehicles/`. All folder names are lowercase.
 
 ## Step 0: prepare the model
 
-Convert the original PLY to **Streamed SOG** with PlayCanvas's `splat-transform` CLI. This keeps full detail near the camera, splits the model into many small files that fit GitHub's 100 MB per-file limit, and loads progressively. Always start from the original PLY, never from the existing 240 MB SOG, which is already quantized.
+Convert the scan to **Streamed SOG** with PlayCanvas's `splat-transform` CLI. This keeps full detail near the camera, splits the model into many small files that fit GitHub's 100 MB per-file limit, and loads progressively.
 
-Streamed SOG is a folder with a `lod-meta.json` index and one unbundled SOG chunk per subfolder ([format](https://developer.playcanvas.com/user-manual/gaussian-splatting/formats/streamed-sog/)). Lower LOD levels are made by decimating the source ([guide](https://developer.playcanvas.com/user-manual/splat-transform/streamed-sog/)):
+The source is the PortalCam / LCC Studio **PLY export** (13.9M splats, SH degree 0, Z-up, metres). It already contains six detail levels, `point_cloud.ply` then `point_cloud_1…5.ply` (each about half the previous), plus `environment.ply`, a small distant sky shell. These map straight onto Streamed SOG LOD levels 0–5, with the environment tagged as level -1 (always drawn), so no decimation is needed. Each input is rotated +90° about X to make it Y-up for PlayCanvas; the viewer applies no further rotation, so stop poses are plain world coordinates.
+
+`tools/prepare-model.sh` runs this ([Streamed SOG format](https://developer.playcanvas.com/user-manual/gaussian-splatting/formats/streamed-sog/), [guide](https://developer.playcanvas.com/user-manual/splat-transform/streamed-sog/)):
 
 ```bash
 npm install -g @playcanvas/splat-transform
-
-# Run from the working folder "Claude - 3DGS"
-# Optional: crop first in SuperSplat to the area the stops cover; export over source/scene.ply
-
-# Inspect the source
-splat-transform source/scene.ply --stats null
-
-# Build lower detail levels
-splat-transform source/scene.ply -d 50% source/lod1.ply
-splat-transform source/scene.ply -d 25% source/lod2.ply
-splat-transform source/scene.ply -d 10% source/lod3.ply
-
-# Bundle into Streamed SOG
+P=source/tucson/ply/point_cloud/iteration_100
 splat-transform \
-  source/scene.ply -l 0 source/lod1.ply -l 1 source/lod2.ply -l 2 source/lod3.ply -l 3 \
-  public/model/lod-meta.json \
-  --filter-nan --filter-harmonics 1
+  $P/point_cloud.ply   -r 90,0,0 -l 0 \
+  $P/point_cloud_1.ply -r 90,0,0 -l 1 \
+  …                                   \
+  $P/point_cloud_5.ply -r 90,0,0 -l 5 \
+  $P/environment.ply   -r 90,0,0 -l -1 \
+  public/model/lod-meta.json --filter-nan --filter-harmonics 0
 ```
 
-Treat these numbers as a starting point. Claude Code should put the commands in `tools/prepare-model.sh` and report total size and largest file. (The Goldfield scan has no higher-order spherical harmonics, so `--filter-harmonics 0` is lossless and the 0/1/2 comparison doesn't apply.) `--decimate-adaptive` may give better results on scenes with sky.
+Result: 319 MB in 307 files, largest 2.2 MB (LOD 0 162 MB … LOD 5 4.9 MB, environment 92 KB).
 
-**Fallback:** if streaming is too complex for v1, write one decimated, unbundled SOG instead (`-d 25%`, then output `public/model/meta.json`). Aim for about 50 MB total.
-
-**Tip:** `splat-transform` can also read XGRIDS `.lcc` files directly, so the PortalCam export may work as a source too.
+World facts: the hangar floor is at y ≈ −1.4 and the roof at y ≈ 5.5–6, so eye height is y ≈ 0.2. The hall runs along +Z (roughly x −20…5, z 0…61 along the capture path). The scan is indoors: overview poses must stay under the roof.
 
 **Done when:** every file under `public/model/` is under 100 MB, the full folder is well under GitHub Pages' 1 GB site limit, and it looks right at the stops in the PlayCanvas viewer.
 
@@ -88,13 +81,13 @@ All tour content lives in `public/stops.json`. The app reads it on load; dev mod
 
 ```json
 {
-  "title": "Goldfield Ghost Town",
-  "subtitle": "Apache Junction, Arizona",
+  "title": "Tucson Military Vehicle Museum",
+  "subtitle": "Tucson, Arizona",
   "model": "model/lod-meta.json",
   "stops": [
     {
       "id": "stop-1",
-      "title": "Goldfield Ghost Town",
+      "title": "Museum overview",
       "camera": {
         "position": [12.4, 8.1, -3.0],
         "target":   [0.0, 1.2, 0.0],
@@ -219,7 +212,7 @@ Ask Claude Code to work through these one at a time and stop for your review aft
 1. **Prepare the model** (Step 0).
    - Done when: `public/model/` meets the Step 0 checks and a size report is printed.
 2. **Bare viewer.** Vite + PlayCanvas page that loads the model full-screen with orbit controls.
-   - Done when: `npm run dev` shows the town, stays above \~50 fps on your laptop, and the loading indicator works.
+   - Done when: `npm run dev` shows the hangar, stays above \~50 fps on your laptop, and the loading indicator works.
 3. **Stops + navigation.** Load `stops.json` (10 placeholder stops), Prev/Next buttons, arrow keys, counter, hash deep links. Camera jumps instantly for now.
    - Done when: every route to a stop (button, key, hash) lands on the same pose.
 4. **Camera transitions.** Eased flights, arc for long moves, interruptible, reduced-motion fallback.

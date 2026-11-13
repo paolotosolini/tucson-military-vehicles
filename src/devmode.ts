@@ -340,7 +340,7 @@ export function initDevMode(ctx: DevContext): void {
         }
       }
       await downloadZip(files);
-      status('Downloaded goldfield-tour.zip. Unzip it into public/, then commit.');
+      status('Downloaded tmvm-tour.zip. Unzip it into public/, then commit.');
     } catch (err) {
       console.error(err);
       status(`Export failed: ${(err as Error).message}`, 'warn');
@@ -441,7 +441,7 @@ async function publicDir(): Promise<DirHandle> {
     const picker = (window as unknown as {
       showDirectoryPicker(o: object): Promise<DirHandle>;
     }).showDirectoryPicker;
-    dir = await picker({ id: 'goldfield-public', mode: 'readwrite', startIn: 'documents' });
+    dir = await picker({ id: 'tmvm-public', mode: 'readwrite', startIn: 'documents' });
     try {
       await dir.getDirectoryHandle('model');
     } catch {
@@ -482,7 +482,7 @@ async function downloadZip(files: { path: string; blob: Blob }[]): Promise<void>
   const url = URL.createObjectURL(createZip(entries));
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'goldfield-tour.zip';
+  a.download = 'tmvm-tour.zip';
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
@@ -491,7 +491,7 @@ async function downloadZip(files: { path: string; blob: Blob }[]): Promise<void>
 
 function idb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('goldfield-dev', 1);
+    const req = indexedDB.open('tmvm-dev', 1);
     req.onupgradeneeded = () => req.result.createObjectStore('kv');
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);

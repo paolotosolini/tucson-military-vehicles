@@ -92,7 +92,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 
 // --- Local edits (dev mode autosave) ---------------------------------------------------
 
-const STORAGE_KEY = 'goldfield-tour-dev-edits';
+const STORAGE_KEY = 'tmvm-tour-dev-edits';
 
 export interface LocalEdits {
   savedAt: number;

@@ -9,7 +9,7 @@ import { defineConfig, type Plugin } from 'vite';
 function devSave(): Plugin {
   const allowed = /^(stops\.json|thumbs\/stop-\d+\.webp)$/;
   return {
-    name: 'goldfield-dev-save',
+    name: 'tour-dev-save',
     apply: 'serve',
     configureServer(server) {
       const publicDir = server.config.publicDir;
@@ -62,7 +62,7 @@ function devSave(): Plugin {
 }
 
 export default defineConfig({
-  base: '/goldfield/',
+  base: '/tucson-military-vehicles/',
   plugins: [devSave()],
   build: { target: 'es2022', chunkSizeWarningLimit: 4000 },
 });
