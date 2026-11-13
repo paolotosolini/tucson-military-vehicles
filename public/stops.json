@@ -5,10 +5,10 @@
   "stops": [
     {
       "id": "stop-1",
-      "title": "Museum overview",
+      "title": "BMP-1 Amphibious vechicle",
       "camera": {
-        "position": [-7.5, 4, -4],
-        "target": [-7.5, -0.8, 28],
+        "position": [-9.054, 0.357, 18.829],
+        "target": [15.081, -4.813, -3.862],
         "fov": 65
       },
       "thumbnail": "thumbs/stop-1.webp",
@@ -16,10 +16,10 @@
     },
     {
       "id": "stop-2",
-      "title": "Stop 2",
+      "title": "Soviet T-34-85 Tank",
       "camera": {
-        "position": [-2.55, 0.2, 11.87],
-        "target": [-4.39, -0.5, 18.63],
+        "position": [1.185, -0.077, 22.867],
+        "target": [1.918, -0.951, 29.815],
         "fov": 60
       },
       "thumbnail": "thumbs/stop-2.webp",
@@ -27,10 +27,10 @@
     },
     {
       "id": "stop-3",
-      "title": "Stop 3",
+      "title": "M1151A1 Up-Armored HMMWV",
       "camera": {
-        "position": [3.66, 0.2, 19.68],
-        "target": [-1.48, -0.5, 24.44],
+        "position": [-4.261, 0.04, 3.64],
+        "target": [-2.727, -1.191, 10.401],
         "fov": 60
       },
       "thumbnail": "thumbs/stop-3.webp",
