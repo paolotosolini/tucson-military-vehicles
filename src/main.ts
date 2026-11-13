@@ -135,6 +135,14 @@ function wireTransitions(tour: Tour, viewer: Viewer, canvas: HTMLCanvasElement, 
   });
 }
 
+// Typing in a text field must never drive the camera. PlayCanvas's CameraControls listens for
+// keys on window (bubble phase), so stop key presses from inputs at the document. Only keydown:
+// a keyup that gets through just releases a key the controls never saw pressed (harmless), whereas
+// blocking keyup could leave a key "held" if it was pressed before focusing the field.
+document.addEventListener('keydown', (e) => {
+  if (isTyping(e.target)) e.stopPropagation();
+});
+
 // On localhost, the ` key switches dev mode on/off (reloads with or without ?dev=1).
 // (The spec suggested D, but D is also "strafe right" when flying with WASD.)
 if (isLocalhost()) {

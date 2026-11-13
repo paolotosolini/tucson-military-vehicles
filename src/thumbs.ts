@@ -23,6 +23,7 @@ export class ThumbStore {
   /** Records a newly captured thumbnail for a stop. */
   set(stop: Stop, blob: Blob): void {
     const old = this.sources.get(stop);
+    if (old?.kind === 'blob' && old.blob === blob) return; // unchanged: keep the URL cards use
     if (old?.kind === 'blob') URL.revokeObjectURL(old.url);
     this.sources.set(stop, { kind: 'blob', blob, url: URL.createObjectURL(blob) });
   }

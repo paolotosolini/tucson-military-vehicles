@@ -198,6 +198,8 @@ Dev mode is how you author the tour: fly to a view, snap it, type the text, expo
 
 **Export**
 
+- Changes save automatically: about a second after any edit (snap, title, drift, add, delete, reorder) dev mode writes `stops.json` and the thumbnails into `public/`, and the HUD shows "✓ Saved to project". The Save button / `Ctrl+S` saves immediately. Exit warns if something didn't save.
+- Typing in dev-mode text fields never moves the camera (key presses from inputs are kept away from the camera controls).
 - Preferred (`npm run dev`): the dev server has a small save endpoint (dev only, never in the build) that writes `stops.json` and `thumbs/*.webp` straight into `public/`. You review the diff and commit.
 - Otherwise (Chrome/Edge): the File System Access API, picking the repo's `public/` folder once.
 - Last resort: download a `.zip` with the same layout to unzip into `public/`.

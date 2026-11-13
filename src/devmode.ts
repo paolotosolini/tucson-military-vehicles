@@ -63,7 +63,7 @@ export function initDevMode(ctx: DevContext): void {
       <button class="dev-btn" data-act="snap" title="Save the current camera to this stop (Space)">Snap pose <kbd>Space</kbd></button>
       <button class="dev-btn" data-act="add" title="Insert a stop after this one at the current view (N)">Add stop <kbd>N</kbd></button>
       <button class="dev-btn" data-act="preview" title="Fly in from the previous stop (P)">Preview <kbd>P</kbd></button>
-      <button class="dev-btn dev-btn--primary" data-act="export" title="Write stops.json and thumbnails (Ctrl/⌘+S)">Export <kbd>⌘S</kbd></button>
+      <button class="dev-btn dev-btn--primary" data-act="export" title="Save stops.json and thumbnails into the project's public/ folder (Ctrl/⌘+S). Changes also save automatically.">Save <kbd>⌘S</kbd></button>
     </div>
     <details class="dev-hud__more">
       <summary>More</summary>
@@ -77,6 +77,7 @@ export function initDevMode(ctx: DevContext): void {
         Stops: <kbd>[</kbd>/<kbd>]</kbd> reorder · <kbd>Del</kbd> delete · arrows to move between stops
       </p>
     </details>
+    <p class="dev-hud__saved" data-state="saved" aria-live="polite">✓ Saved to project</p>
     <p class="dev-hud__status" role="status" aria-live="polite"></p>`;
   ui.appendChild(hud);
 
@@ -112,26 +113,70 @@ export function initDevMode(ctx: DevContext): void {
     viewer.camera.camera!.fov = Number(fovInput.value);
   });
 
-  // ---------------------------------------------------------------- autosave
-  let saveTimer = 0;
-  const autosave = () => {
-    clearTimeout(saveTimer);
-    saveTimer = window.setTimeout(async () => {
-      const ok = saveLocalEdits({
-        savedAt: Date.now(),
-        data: tour.data,
-        thumbs: await thumbs.snapshot(tour.stops),
-      });
-      if (!ok) status('Autosave failed: browser storage is full. Export soon.', 'warn');
-    }, 300);
+  // ---------------------------------------------------------------- saving
+  // Every change is saved twice, automatically: to this browser (instant backup that survives a
+  // reload) and, about a second later, into the project's public/ folder through the dev
+  // server, which is what visitors see and what you commit. The ⌘S / Save button does the
+  // project save immediately; if the dev server isn't there, it falls back to a folder or zip.
+  const savedEl = $('.dev-hud__saved');
+  let dirty = false; // changes not yet written into the project
+  const showSaved = (state: 'saved' | 'saving' | 'unsaved', text?: string) => {
+    savedEl.dataset.state = state;
+    savedEl.textContent =
+      text ?? (state === 'saved' ? '✓ Saved to project' : state === 'saving' ? 'Saving…' : '● Unsaved changes');
   };
+
+  let localTimer = 0;
+  let projectTimer = 0;
+  const autosave = () => {
+    dirty = true;
+    showSaved('unsaved');
+    clearTimeout(localTimer);
+    localTimer = window.setTimeout(async () => {
+      const ok = saveLocalEdits({ savedAt: Date.now(), data: tour.data, thumbs: await thumbs.snapshot(tour.stops) });
+      if (!ok) status('Browser backup failed (storage full). Changes still save to the project.', 'warn');
+    }, 300);
+    clearTimeout(projectTimer);
+    projectTimer = window.setTimeout(() => saveToProject(), 1000);
+  };
+
+  /** Writes stops.json + thumbnails into public/ via the dev server. Returns false if unavailable. */
+  const saveToProject = async (): Promise<boolean> => {
+    if (busy) {
+      // a snap/thumbnail render is running; try again shortly
+      clearTimeout(projectTimer);
+      projectTimer = window.setTimeout(() => saveToProject(), 500);
+      return false;
+    }
+    busy = true;
+    try {
+      showSaved('saving');
+      const { files, written } = await collectFiles();
+      if (await saveViaDevServer(files)) {
+        // From now on, each stop's thumbnail is exactly the image just written, so later saves
+        // never re-read a file that this save may have renamed.
+        written.forEach(([stop, blob]) => thumbs.set(stop, blob));
+        dirty = false;
+        showSaved('saved');
+        return true;
+      }
+      showSaved('unsaved', '● Not saved to project: press Save');
+      return false;
+    } finally {
+      busy = false;
+    }
+  };
+
+  window.addEventListener('beforeunload', (e) => {
+    if (dirty) e.preventDefault();
+  });
 
   // ---------------------------------------------------------------- editor in the active card
   const editor = document.createElement('div');
   editor.className = 'dev-editor';
   editor.innerHTML = `
     <div class="dev-editor__head" data-e="head"></div>
-    <label>Title <input type="text" maxlength="30" data-e="title" placeholder="e.g. Five stamp mill" /></label>
+    <label>Title <input type="text" maxlength="30" data-e="title" placeholder="e.g. M113 APC" /></label>
     <div class="dev-editor__row">
       <label>Drift
         <select data-e="drift">
@@ -300,36 +345,54 @@ export function initDevMode(ctx: DevContext): void {
     location.reload();
   };
 
+  let exitArmed = 0;
+  const exit = (btn: HTMLElement) => {
+    if (dirty && performance.now() > exitArmed) {
+      exitArmed = performance.now() + 4000;
+      btn.textContent = 'Unsaved! Exit anyway?';
+      setTimeout(() => (btn.textContent = 'Exit'), 4000);
+      return;
+    }
+    dirty = false; // don't trigger the browser's own leave-page prompt as well
+    toggleDevMode(false);
+  };
+
   // ---------------------------------------------------------------- export
-  const collectFiles = async (): Promise<{ path: string; blob: Blob }[]> => {
+  const collectFiles = async () => {
     // Read every thumbnail before writing anything: renumbered stops may overwrite each other.
     const blobs = await Promise.all(tour.stops.map((s) => thumbs.blob(s)));
-    tour.stopsChanged(); // make sure ids/paths are in order
+    const inOrder = tour.stops.every((s, i) => s.id === `stop-${i + 1}` && s.thumbnail === thumbPath(s.id));
+    if (!inOrder) tour.stopsChanged();
     const files = [{ path: 'stops.json', blob: new Blob([serializeTour(tour.data)], { type: 'application/json' }) }];
+    const written: [Stop, Blob][] = [];
     tour.stops.forEach((s, i) => {
       const b = blobs[i];
-      if (b) files.push({ path: thumbPath(s.id), blob: b });
+      if (!b) return;
+      files.push({ path: thumbPath(s.id), blob: b });
+      written.push([s, b]);
     });
-    return files;
+    return { files, written };
   };
 
   const exportAll = async () => {
+    clearTimeout(projectTimer);
+    // 1. Local dev server: write straight into public/ (no folder picker needed).
+    if (await saveToProject()) {
+      status('Saved into the project (public/). Review the diff and commit.');
+      return;
+    }
     if (busy) return;
     busy = true;
     try {
-      status('Exporting…', 'busy');
-      const files = await collectFiles();
-      // 1. Local dev server: write straight into public/ (no folder picker needed).
-      if (await saveViaDevServer(files)) {
-        const n = files.length - 1;
-        status(`Saved stops.json and ${n} thumbnail${n === 1 ? '' : 's'} to public/. Review the diff and commit.`);
-        return;
-      }
+      status('Saving…', 'busy');
+      const { files } = await collectFiles();
       // 2. Chrome/Edge: write into a folder the user picks. 3. Anything else: a zip download.
       if ('showDirectoryPicker' in window) {
         try {
           const dir = await publicDir();
           await writeFiles(dir, files);
+          dirty = false;
+          showSaved('saved');
           const n = files.length - 1;
           status(`Saved stops.json and ${n} thumbnail${n === 1 ? '' : 's'} to public/. Review the diff and commit.`);
           return;
@@ -363,15 +426,23 @@ export function initDevMode(ctx: DevContext): void {
     else if (act === 'export') exportAll();
     else if (act === 'rethumb') rethumbAll();
     else if (act === 'discard') discard(btn);
-    else if (act === 'exit') toggleDevMode(false);
+    else if (act === 'exit') exit(btn);
   });
 
+  // ⌘S / Ctrl+S: capture phase, so it also works while typing in the title field.
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        exportAll();
+      }
+    },
+    true,
+  );
+
   window.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
-      e.preventDefault();
-      exportAll();
-      return;
-    }
     if (isTyping(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
     switch (e.key) {
       case ' ':
