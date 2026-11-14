@@ -5,7 +5,7 @@
   "stops": [
     {
       "id": "stop-1",
-      "title": "BMP-1 Amphibious vechicle",
+      "title": "Top overview",
       "camera": {
         "position": [-9.054, 0.357, 18.829],
         "target": [15.081, -4.813, -3.862],
@@ -38,10 +38,10 @@
     },
     {
       "id": "stop-4",
-      "title": "Stop 4",
+      "title": "Husky MK III Mine Detection",
       "camera": {
-        "position": [-10.79, 0.2, 25.9],
-        "target": [-9.38, -0.5, 19.04],
+        "position": [-4.159, 0.796, 40.542],
+        "target": [-9.904, -0.768, 44.295],
         "fov": 60
       },
       "thumbnail": "thumbs/stop-4.webp",
@@ -49,10 +49,10 @@
     },
     {
       "id": "stop-5",
-      "title": "Stop 5",
+      "title": "M60A1 Main Battle Tank",
       "camera": {
-        "position": [3.16, 0.2, 31.16],
-        "target": [-3.8, -0.5, 30.4],
+        "position": [-10.565, 0.796, 38.262],
+        "target": [-15.31, -0.681, 43.243],
         "fov": 60
       },
       "thumbnail": "thumbs/stop-5.webp",
@@ -60,7 +60,7 @@
     },
     {
       "id": "stop-6",
-      "title": "Stop 6",
+      "title": "Buffalo A2 Mine Clearance",
       "camera": {
         "position": [-4.4, 0.2, 38.94],
         "target": [-6.69, -0.5, 32.32],
@@ -71,21 +71,21 @@
     },
     {
       "id": "stop-7",
-      "title": "Stop 7",
+      "title": "M88A2 Hercules",
       "camera": {
-        "position": [-4.99, 0.2, 44.28],
-        "target": [-6.2, -0.5, 37.39],
+        "position": [-20.218, 0.705, 56.925],
+        "target": [-14.084, -0.991, 53.936],
         "fov": 60
       },
       "thumbnail": "thumbs/stop-7.webp",
-      "drift": "sway"
+      "drift": "orbit"
     },
     {
       "id": "stop-8",
-      "title": "Stop 8",
+      "title": "Otter Light Reconnaissance",
       "camera": {
-        "position": [-5.41, 0.2, 45.96],
-        "target": [-6.32, -0.5, 39.02],
+        "position": [5.831, 0.046, 8.581],
+        "target": [-1.069, -1.229, 9.081],
         "fov": 60
       },
       "thumbnail": "thumbs/stop-8.webp",
@@ -93,10 +93,10 @@
     },
     {
       "id": "stop-9",
-      "title": "Stop 9",
+      "title": "Centurios MK 5 Tank",
       "camera": {
-        "position": [-12.39, 0.2, 58.02],
-        "target": [-11.18, -0.5, 51.12],
+        "position": [0.43, 0.155, 42.247],
+        "target": [-0.041, -0.679, 35.272],
         "fov": 60
       },
       "thumbnail": "thumbs/stop-9.webp",
@@ -106,8 +106,8 @@
       "id": "stop-10",
       "title": "Stop 10",
       "camera": {
-        "position": [4.45, 0.2, 25.88],
-        "target": [-2.17, -0.5, 28.16],
+        "position": [-9.006, 0.228, 19.128],
+        "target": [-3.855, -0.992, 14.492],
         "fov": 60
       },
       "thumbnail": "thumbs/stop-10.webp",
