@@ -30,8 +30,10 @@ interface DevContext {
   nav: Nav;
   thumbs: ThumbStore;
   ui: HTMLElement;
-  /** Shown once in the status line, e.g. "Restored local edits from …". */
+  /** Shown once in the status line, e.g. "Restored unsaved edits from …". */
   initialStatus?: string;
+  /** True when the stops came from this browser's backup of unsaved edits, not the project. */
+  restored?: boolean;
 }
 
 const round = (v: number, d = 3) => Math.round(v * 10 ** d) / 10 ** d;
@@ -126,6 +128,14 @@ export function initDevMode(ctx: DevContext): void {
       text ?? (state === 'saved' ? '✓ Saved to project' : state === 'saving' ? 'Saving…' : '● Unsaved changes');
   };
 
+  // Which thumbnails need writing. Saves write stops.json plus only the thumbnails that were
+  // re-captured or renumbered since the last save, so a save can never overwrite good images on
+  // disk with older ones it happens to hold in memory.
+  const onDisk = new Map<Stop, string>(); // the id under which a stop's image is on disk
+  const changedThumbs = new Set<Stop>(); // captured since the last save
+  if (!ctx.restored) tour.stops.forEach((st) => onDisk.set(st, st.id));
+  const needsWrite = (st: Stop) => changedThumbs.has(st) || onDisk.get(st) !== st.id;
+
   let localTimer = 0;
   let projectTimer = 0;
   const autosave = () => {
@@ -151,11 +161,18 @@ export function initDevMode(ctx: DevContext): void {
     busy = true;
     try {
       showSaved('saving');
-      const { files, written } = await collectFiles();
-      if (await saveViaDevServer(files)) {
-        // From now on, each stop's thumbnail is exactly the image just written, so later saves
-        // never re-read a file that this save may have renamed.
-        written.forEach(([stop, blob]) => thumbs.set(stop, blob));
+      const { files, written } = await collectFiles(needsWrite);
+      if (await saveViaDevServer(files, tour.stops.map((st) => `${st.id}.webp`))) {
+        // Each written stop's thumbnail is now exactly the image just written (so later saves
+        // never re-read a file this save renamed), and it's on disk under its current id.
+        for (const [st, blob] of written) {
+          thumbs.set(st, blob);
+          onDisk.set(st, st.id);
+          changedThumbs.delete(st);
+        }
+        // Everything is in the project now; the browser backup only ever holds unsaved changes.
+        clearTimeout(localTimer);
+        clearLocalEdits();
         dirty = false;
         showSaved('saved');
         return true;
@@ -236,6 +253,7 @@ export function initDevMode(ctx: DevContext): void {
   const capture = async (stop: Stop) => {
     await viewer.waitForDetail();
     thumbs.set(stop, await viewer.captureImage());
+    changedThumbs.add(stop);
   };
 
   const snap = async () => {
@@ -358,14 +376,16 @@ export function initDevMode(ctx: DevContext): void {
   };
 
   // ---------------------------------------------------------------- export
-  const collectFiles = async () => {
-    // Read every thumbnail before writing anything: renumbered stops may overwrite each other.
-    const blobs = await Promise.all(tour.stops.map((s) => thumbs.blob(s)));
+  /** stops.json plus the thumbnails `include` selects (default: all, for folder/zip export). */
+  const collectFiles = async (include: (s: Stop) => boolean = () => true) => {
     const inOrder = tour.stops.every((s, i) => s.id === `stop-${i + 1}` && s.thumbnail === thumbPath(s.id));
     if (!inOrder) tour.stopsChanged();
+    const chosen = tour.stops.filter(include);
+    // Read every thumbnail before writing anything: renumbered stops may overwrite each other.
+    const blobs = await Promise.all(chosen.map((s) => thumbs.blob(s)));
     const files = [{ path: 'stops.json', blob: new Blob([serializeTour(tour.data)], { type: 'application/json' }) }];
     const written: [Stop, Blob][] = [];
-    tour.stops.forEach((s, i) => {
+    chosen.forEach((s, i) => {
       const b = blobs[i];
       if (!b) return;
       files.push({ path: thumbPath(s.id), blob: b });
@@ -477,15 +497,14 @@ export function initDevMode(ctx: DevContext): void {
 // -------------------------------------------------------------------- File System Access
 
 /** Writes via the Vite dev server's /__dev endpoints; false if they aren't there. */
-async function saveViaDevServer(files: { path: string; blob: Blob }[]): Promise<boolean> {
+async function saveViaDevServer(files: { path: string; blob: Blob }[], keepThumbs: string[]): Promise<boolean> {
   const endpoint = (p: string) => `/__dev/${p}`;
   try {
     for (const f of files) {
       const res = await fetch(`${endpoint('save')}?path=${encodeURIComponent(f.path)}`, { method: 'POST', body: f.blob });
       if (!res.ok) return false;
     }
-    const keep = files.filter((f) => f.path.startsWith('thumbs/')).map((f) => f.path.slice('thumbs/'.length));
-    await fetch(endpoint('prune-thumbs'), { method: 'POST', body: JSON.stringify(keep) });
+    await fetch(endpoint('prune-thumbs'), { method: 'POST', body: JSON.stringify(keepThumbs) });
     return true;
   } catch {
     return false;

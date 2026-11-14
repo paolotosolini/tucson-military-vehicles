@@ -62,7 +62,8 @@ async function start() {
         nav,
         thumbs,
         ui,
-        initialStatus: edits ? `Restored local edits from ${when}.` : undefined,
+        initialStatus: edits ? `Restored unsaved edits from ${when}.` : undefined,
+        restored: !!edits,
       });
     }
 

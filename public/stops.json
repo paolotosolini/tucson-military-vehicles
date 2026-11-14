@@ -7,8 +7,8 @@
       "id": "stop-1",
       "title": "Top overview",
       "camera": {
-        "position": [-7.976, 23.875, -0.069],
-        "target": [-7.562, -16.021, 33.801],
+        "position": [-5.286, 18.448, 3.276],
+        "target": [-4.922, -16.628, 33.054],
         "fov": 65
       },
       "thumbnail": "thumbs/stop-1.webp",

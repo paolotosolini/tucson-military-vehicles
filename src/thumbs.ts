@@ -93,7 +93,8 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 
 // --- Local edits (dev mode autosave) ---------------------------------------------------
 
-const STORAGE_KEY = 'tmvm-tour-dev-edits';
+// v2: backups now only ever hold unsaved changes (cleared after each save into the project).
+const STORAGE_KEY = 'tmvm-tour-dev-edits-v2';
 
 export interface LocalEdits {
   savedAt: number;
