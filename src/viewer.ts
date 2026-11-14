@@ -44,9 +44,9 @@ export type FlightResult = 'arrived' | 'replaced' | 'interrupted';
 
 export type DriftKind = 'orbit' | 'sway' | 'none';
 
-const SWAY_DEGREES = 3.5; // peak yaw either side of the saved view
-const SWAY_PERIOD = 8; // seconds for one full side-to-side cycle
-const ORBIT_DEG_PER_SEC = 3; // one revolution every two minutes
+const SWAY_DEGREES = 1.5; // peak yaw either side of the saved view
+const SWAY_PERIOD = 14; // seconds for one full side-to-side cycle
+const ORBIT_DEG_PER_SEC = 2; // one revolution every three minutes
 const DRIFT_RAMP = 2.5; // seconds to ease into the motion
 const smoothstep = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
@@ -125,7 +125,7 @@ export class Viewer {
     const { position, fov } = opts.initialPose;
     const camera = new Entity('camera');
     camera.addComponent('camera', {
-      clearColor: new Color(0.73, 0.78, 0.82),
+      clearColor: new Color(0.035, 0.035, 0.04), // near-black: the roofless hall floats in darkness
       fov,
       nearClip: 0.05,
       farClip: 10000, // the scan's sky/environment shell reaches ~1,500 units out

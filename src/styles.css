@@ -12,7 +12,7 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: #17120e;
+  background: #09090a;
   color: var(--ink);
 }
 
@@ -351,3 +351,39 @@ kbd {
 .dev-editor__confirm { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 8px; background: rgba(200, 70, 50, 0.18); }
 .dev-editor__confirm[hidden] { display: none; }
 .dev-editor__confirm span { flex: 1; }
+
+/* ---- Framing: vignette and museum title ---- */
+.vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3; /* over the canvas only: thumbnails (read from the canvas) stay clean */
+  background:
+    radial-gradient(ellipse 75% 70% at 45% 50%, transparent 55%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.35), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.3));
+}
+
+.brand {
+  position: absolute;
+  top: 22px;
+  left: 26px;
+  max-width: calc(100vw - 340px - 52px);
+  pointer-events: none;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6);
+}
+.brand__title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.brand__subtitle {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+/* Dev mode's HUD takes the top-left corner */
+.is-dev .brand { display: none; }

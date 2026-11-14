@@ -123,7 +123,7 @@ Order in the array is tour order. Until poses are captured, ship 10 stops with p
 
 ## Viewer and tour behavior
 
-The splat fills the window; the carousel floats over the right side, about 340 px wide, without a panel behind it. The scene stays explorable at all times.
+The splat fills the window over a near-black background (#09090a), with a soft vignette around the edges (an overlay above the canvas, so thumbnails stay clean). The museum name and "Tucson, Arizona" sit small and persistent at the top-left (hidden in dev mode, where the HUD takes that corner). The carousel floats over the right side, about 340 px wide, without a panel behind it. The scene stays explorable at all times.
 
 ```
 +--------------------------------------------+-------------+
@@ -164,7 +164,7 @@ The splat fills the window; the carousel floats over the right side, about 340 p
 
 **Idle drift**
 
-- After arriving, start the stop's drift: `sway` = slow side-to-side movement of a few degrees around the target over \~8 s; `orbit` = slow continuous orbit (stop 1, the overview).
+- After arriving, start the stop's drift: `sway` = a gentle ±1.5° side-to-side movement around the target over \~14 s; `orbit` = slow continuous orbit, 2°/s.
 - Any user input on the canvas stops the drift and hands control to the user. The active card stays selected; a "Back to view" button on the card returns to the saved pose.
 
 **Loading**

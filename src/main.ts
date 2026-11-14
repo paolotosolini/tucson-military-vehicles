@@ -28,6 +28,8 @@ async function start() {
     if (edits) await thumbs.restore(tour.stops, edits.thumbs);
     loader.querySelector('.loader__title')!.textContent = data.title;
     loader.querySelector('.loader__subtitle')!.textContent = data.subtitle;
+    ui.querySelector('.brand__title')!.textContent = data.title;
+    ui.querySelector('.brand__subtitle')!.textContent = data.subtitle;
 
     // UI is built straight away (the carousel's thumbnails can load while the model streams).
     const nav = createNav(tour, ui);
