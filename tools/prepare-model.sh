@@ -6,8 +6,11 @@
 #   SRC=/path/to/point_cloud/iteration_100 tools/prepare-model.sh
 #
 # The export already contains the scan at six detail levels (point_cloud.ply, then _1 … _5,
-# each about half the previous) plus environment.ply (a distant sky shell). They map straight onto
-# Streamed SOG LOD levels 0–5, with the environment tagged as LOD -1 (always shown).
+# each about half the previous). They map straight onto Streamed SOG LOD levels 0–5.
+#
+# First, tools/crop-scan.mjs crops every level to the inside of the hangar: it removes the roof
+# (everything above y = 2.9) and all splats outside the walls. environment.ply (a distant sky
+# shell) is left out for the same reason: the scan is entirely indoors.
 #
 # The scan is Z-up; PlayCanvas is Y-up, so every input is rotated +90° about X (raw z → world y).
 # The viewer applies no further rotation, so stop poses in stops.json are plain world coordinates.
@@ -17,20 +20,20 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="${SRC:-$ROOT/source/tucson/ply/point_cloud/iteration_100}"
+CROP="$ROOT/source/tucson/cropped"
 OUT="$ROOT/public/model"
 ROTATE="90,0,0"
 
 [[ -f "$SRC/point_cloud.ply" ]] || { echo "missing $SRC/point_cloud.ply" >&2; exit 1; }
 
-args=("$SRC/point_cloud.ply" -r "$ROTATE" -l 0)
-for i in 1 2 3 4 5; do
-  f="$SRC/point_cloud_$i.ply"
-  [[ -f "$f" ]] && args+=("$f" -r "$ROTATE" -l "$i")
-done
-[[ -f "$SRC/environment.ply" ]] && args+=("$SRC/environment.ply" -r "$ROTATE" -l -1)
+echo "== cropping to the hangar interior (roof and outside removed)"
+mkdir -p "$CROP"
+names=(point_cloud.ply)
+for i in 1 2 3 4 5; do [[ -f "$SRC/point_cloud_$i.ply" ]] && names+=("point_cloud_$i.ply"); done
+for n in "${names[@]}"; do node "$ROOT/tools/crop-scan.mjs" "$SRC/$n" "$CROP/$n"; done
 
-echo "== inputs"
-splat-transform --no-tty "$SRC/point_cloud.ply" --info null | grep -E "gaussians|sh bands"
+args=()
+for lvl in "${!names[@]}"; do args+=("$CROP/${names[$lvl]}" -r "$ROTATE" -l "$lvl"); done
 
 echo "== writing Streamed SOG to $OUT"
 rm -rf "$OUT"
@@ -48,6 +51,5 @@ for lvl in 0 1 2 3 4 5; do
   ls -d "$OUT"/"$lvl"_* >/dev/null 2>&1 || continue
   printf "  LOD %s: %s\n" "$lvl" "$(du -ch "$OUT"/"$lvl"_* | tail -1 | cut -f1)"
 done
-[[ -d "$OUT/env" ]] && printf "  environment: %s\n" "$(du -sh "$OUT/env" | cut -f1)"
 over=$(find "$OUT" -type f -size +100M | wc -l | tr -d ' ')
 echo "files over 100 MB: $over"

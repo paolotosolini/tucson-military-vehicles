@@ -12,6 +12,9 @@ declare module 'playcanvas/scripts/esm/camera-controls.mjs' {
     rotateSpeed: number;
     zoomSpeed: number;
     sceneSize: number;
+    leftButton: 'orbit' | 'pan' | 'look';
+    middleButton: 'orbit' | 'pan' | 'look';
+    rightButton: 'orbit' | 'pan' | 'look';
     focus(focus: Vec3, resetZoom?: boolean): void;
     look(focus: Vec3, resetZoom?: boolean): void;
     reset(focus: Vec3, position: Vec3): void;

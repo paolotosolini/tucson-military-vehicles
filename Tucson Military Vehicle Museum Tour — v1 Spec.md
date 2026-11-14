@@ -53,25 +53,26 @@ Claude - 3DGS/            # working folder = git repo root
 
 Convert the scan to **Streamed SOG** with PlayCanvas's `splat-transform` CLI. This keeps full detail near the camera, splits the model into many small files that fit GitHub's 100 MB per-file limit, and loads progressively.
 
-The source is the PortalCam / LCC Studio **PLY export** (13.9M splats, SH degree 0, Z-up, metres). It already contains six detail levels, `point_cloud.ply` then `point_cloud_1…5.ply` (each about half the previous), plus `environment.ply`, a small distant sky shell. These map straight onto Streamed SOG LOD levels 0–5, with the environment tagged as level -1 (always drawn), so no decimation is needed. Each input is rotated +90° about X to make it Y-up for PlayCanvas; the viewer applies no further rotation, so stop poses are plain world coordinates.
+The source is the PortalCam / LCC Studio **PLY export** (13.9M splats, SH degree 0, Z-up, metres). It already contains six detail levels, `point_cloud.ply` then `point_cloud_1…5.ply` (each about half the previous), which map straight onto Streamed SOG LOD levels 0–5, so no decimation is needed.
 
-`tools/prepare-model.sh` runs this ([Streamed SOG format](https://developer.playcanvas.com/user-manual/gaussian-splatting/formats/streamed-sog/), [guide](https://developer.playcanvas.com/user-manual/splat-transform/streamed-sog/)):
+**Cropping.** The scan is entirely indoors, so `tools/crop-scan.mjs` first crops every level to the inside of the hangar: an oriented box around the walls (0.8 m margin), from just under the floor up to y = 2.9, which removes the roof, the hanging lights and ducts, and all noise outside the building. `environment.ply` (a distant sky shell) is left out. The hall's box is measured from the scan: centre (x −5.6, z 32.19), long axis at −76.1° from +X towards +Z, walls at −31.0 / +34.5 m along and −18.5 / +17.8 m across. With no roof, eye-level views show the background colour above the walls, and the hall can be viewed cleanly from above.
+
+Each input is rotated +90° about X to make it Y-up for PlayCanvas; the viewer applies no further rotation, so stop poses are plain world coordinates. `tools/prepare-model.sh` runs the crop and then ([Streamed SOG format](https://developer.playcanvas.com/user-manual/gaussian-splatting/formats/streamed-sog/), [guide](https://developer.playcanvas.com/user-manual/splat-transform/streamed-sog/)):
 
 ```bash
 npm install -g @playcanvas/splat-transform
-P=source/tucson/ply/point_cloud/iteration_100
+C=source/tucson/cropped
 splat-transform \
-  $P/point_cloud.ply   -r 90,0,0 -l 0 \
-  $P/point_cloud_1.ply -r 90,0,0 -l 1 \
+  $C/point_cloud.ply   -r 90,0,0 -l 0 \
+  $C/point_cloud_1.ply -r 90,0,0 -l 1 \
   …                                   \
-  $P/point_cloud_5.ply -r 90,0,0 -l 5 \
-  $P/environment.ply   -r 90,0,0 -l -1 \
+  $C/point_cloud_5.ply -r 90,0,0 -l 5 \
   public/model/lod-meta.json --filter-nan --filter-harmonics 0
 ```
 
-Result: 319 MB in 307 files, largest 2.2 MB (LOD 0 162 MB … LOD 5 4.9 MB, environment 92 KB).
+Result: 252 MB in 253 files, largest 2.2 MB (LOD 0 138 MB … LOD 5 3.5 MB).
 
-World facts: the hangar floor is at y ≈ −1.4 and the roof at y ≈ 5.5–6, so eye height is y ≈ 0.2. The hall runs along +Z (roughly x −20…5, z 0…61 along the capture path). The scan is indoors: overview poses must stay under the roof.
+World facts: the hangar floor is at y ≈ −1.4 and the roof at y ≈ 5.5–6, so eye height is y ≈ 0.2. The hall runs along +Z (roughly x −20…5, z 0…61 along the capture path). The roof is cropped away, so overview poses can be above the hall, e.g. position (−26, 32, −6) looking at (−5.6, −1.4, 32).
 
 **Done when:** every file under `public/model/` is under 100 MB, the full folder is well under GitHub Pages' 1 GB site limit, and it looks right at the stops in the PlayCanvas viewer.
 
@@ -176,7 +177,7 @@ Dev mode is how you author the tour: fly to a view, snap it, type the text, expo
 
 **Controls**
 
-- Free-fly camera: WASD + right-drag to look, Q/E down/up, Shift for faster movement. Left-drag orbit stays available. Idle drift is off in dev mode.
+- Free-fly camera: WASD, Q/E down/up, Shift for faster movement. Mouse (everywhere, not only dev mode): left-drag orbits, right-drag moves (pans) the model, middle-drag looks around. Idle drift is off in dev mode.
 - A HUD shows the live camera position, target and FOV, plus a FOV slider.
 - The HUD includes an editor for the active stop: title input (max 30 characters) and drift dropdown, with Delete.
 

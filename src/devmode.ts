@@ -73,7 +73,7 @@ export function initDevMode(ctx: DevContext): void {
       </div>
       <p class="dev-hud__keys">
         Fly: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>Q</kbd>/<kbd>E</kbd> down/up · <kbd>Shift</kbd> faster ·
-        right-drag to look · left-drag to orbit<br />
+        left-drag orbit · right-drag move · middle-drag look<br />
         Stops: <kbd>[</kbd>/<kbd>]</kbd> reorder · <kbd>Del</kbd> delete · arrows to move between stops
       </p>
     </details>

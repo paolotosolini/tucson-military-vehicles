@@ -144,6 +144,10 @@ export class Viewer {
       enableOrbit: true,
       enableFly: true,
       enablePan: true,
+      // Left-drag orbits, right-drag moves (pans) the model, middle-drag looks around.
+      leftButton: 'orbit',
+      rightButton: 'pan',
+      middleButton: 'look',
     });
 
     // Streaming / LOD settings
