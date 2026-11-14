@@ -7,8 +7,8 @@
       "id": "stop-1",
       "title": "Top overview",
       "camera": {
-        "position": [-9.054, 0.357, 18.829],
-        "target": [15.081, -4.813, -3.862],
+        "position": [-7.976, 23.875, -0.069],
+        "target": [-7.562, -16.021, 33.801],
         "fov": 65
       },
       "thumbnail": "thumbs/stop-1.webp",
@@ -62,7 +62,7 @@
       "id": "stop-6",
       "title": "Buffalo A2 Mine Clearance",
       "camera": {
-        "position": [-4.4, 0.2, 38.94],
+        "position": [-3.644, 0.431, 41.126],
         "target": [-6.69, -0.5, 32.32],
         "fov": 60
       },
@@ -93,7 +93,7 @@
     },
     {
       "id": "stop-9",
-      "title": "Centurios MK 5 Tank",
+      "title": "Centurion MK 5 Tank",
       "camera": {
         "position": [0.43, 0.155, 42.247],
         "target": [-0.041, -0.679, 35.272],
@@ -104,7 +104,7 @@
     },
     {
       "id": "stop-10",
-      "title": "Stop 10",
+      "title": "BMP-I Amphibious",
       "camera": {
         "position": [-9.006, 0.228, 19.128],
         "target": [-3.855, -0.992, 14.492],
