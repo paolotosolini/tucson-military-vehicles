@@ -39,7 +39,11 @@ echo "== writing Streamed SOG to $OUT"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 # Basic colour only (SH degree 0), so --filter-harmonics 0 is lossless.
-splat-transform --no-tty -w "${args[@]}" "$OUT/lod-meta.json" --filter-nan --filter-harmonics 0
+# Small streaming chunks (~128K splats, ~8 m, ~1.7 MB each instead of 512K / 16 m / ~10 MB): a
+# view then fetches full detail only near the camera. Measured at stop 6: 57 MB to fully sharp
+# instead of 120 MB, with the same close-up look. (Encoding takes ~12 minutes.)
+splat-transform --no-tty -w "${args[@]}" "$OUT/lod-meta.json" --filter-nan --filter-harmonics 0 \
+  --lod-chunk-count 128 --lod-chunk-extent 8
 
 echo "== size report"
 du -sh "$OUT"
