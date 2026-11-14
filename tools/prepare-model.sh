@@ -53,3 +53,12 @@ for lvl in 0 1 2 3 4 5; do
 done
 over=$(find "$OUT" -type f -size +100M | wc -l | tr -d ' ')
 echo "files over 100 MB: $over"
+
+# Collision voxels for walk mode (10 cm grid, ~1 MB), from a mid detail level, in the same
+# rotated world space. src/walk.ts reads them with PlayCanvas's VoxelOccupancy.
+echo "== collision voxels for walk mode"
+COL="$ROOT/public/collision"
+rm -rf "$COL"
+mkdir -p "$COL"
+splat-transform --no-tty -w "$CROP/point_cloud_2.ply" -r "$ROTATE" "$COL/hangar.voxel.json" --voxel-size 0.1 >/dev/null
+du -ch "$COL"/* | tail -1

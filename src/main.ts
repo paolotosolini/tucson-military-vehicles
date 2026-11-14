@@ -4,6 +4,7 @@ import { DEV_TOGGLE_KEY, initDevMode, isLocalhost, toggleDevMode } from './devmo
 import { ThumbStore, loadLocalEdits } from './thumbs';
 import { type Stop, Tour, loadTour } from './tour';
 import { Viewer, type Pose } from './viewer';
+import { WalkMode } from './walk';
 
 const base = import.meta.env.BASE_URL;
 const params = new URLSearchParams(location.search);
@@ -52,6 +53,9 @@ async function start() {
     });
 
     wireTransitions(tour, viewer, canvas, carousel);
+    const walk = new WalkMode(viewer, canvas, `${base}collision/hangar`);
+    wireWalk(walk, nav.el, tour, carousel);
+    Object.assign(window, { walk });
     tour.start();
     if (dev) {
       const when = edits ? new Date(edits.savedAt).toLocaleString() : '';
@@ -136,6 +140,36 @@ function wireTransitions(tour: Tour, viewer: Viewer, canvas: HTMLCanvasElement, 
   window.addEventListener('keydown', (e) => {
     if (flyKeys.has(e.code) && !e.metaKey && !e.ctrlKey && !isTyping(e.target)) takeOver();
   });
+}
+
+/** The Walk button in the nav bar, the on-screen hint, and leaving walk mode on stop changes. */
+function wireWalk(walk: WalkMode, nav: HTMLElement, tour: Tour, carousel: Carousel) {
+  const btn = document.createElement('button');
+  btn.className = 'nav__walk';
+  btn.type = 'button';
+  btn.setAttribute('aria-pressed', 'false');
+  btn.title = 'Walk through the museum: click the floor to walk there, drag to look, WASD, Esc to stop';
+  btn.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="4" r="2"/><path d="M9 21l2-6 3 3v3M7 12l3-4 4 1 2 3M10 8l1 7"/></svg>
+    <span>Walk</span>`;
+  btn.addEventListener('mousedown', (e) => e.preventDefault());
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    walk.toggle().finally(() => (btn.disabled = false));
+  });
+  nav.appendChild(btn);
+
+  const hint = document.createElement('div');
+  hint.className = 'walk-hint';
+  hint.innerHTML = 'Click the floor to walk there · drag to look · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk · <kbd>Esc</kbd> stop';
+  nav.parentElement!.appendChild(hint);
+
+  walk.onChange((on) => {
+    btn.setAttribute('aria-pressed', String(on));
+    hint.classList.toggle('is-on', on);
+  });
+  tour.onChange(() => walk.exit());
+  carousel.onBackToView(() => walk.exit());
 }
 
 // Typing in a text field must never drive the camera. PlayCanvas's CameraControls listens for

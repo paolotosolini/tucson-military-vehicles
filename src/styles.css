@@ -387,3 +387,56 @@ kbd {
 }
 /* Dev mode's HUD takes the top-left corner */
 .is-dev .brand { display: none; }
+
+/* ---- Walk mode ---- */
+.nav__walk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nav__walk:hover:not(:disabled) { background: rgba(255, 255, 255, 0.22); }
+.nav__walk[aria-pressed='true'] { background: var(--accent); color: #1b140e; }
+.nav__walk:disabled { opacity: 0.6; cursor: progress; }
+.nav__walk svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.walk-hint {
+  position: absolute;
+  left: calc((100vw - 340px) / 2);
+  bottom: 92px;
+  transform: translate(-50%, 8px);
+  white-space: nowrap;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(20, 16, 12, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 250ms ease, transform 250ms ease;
+}
+.walk-hint.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- Credit ---- */
+.credit {
+  position: absolute;
+  right: 22px;
+  bottom: 14px;
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  z-index: 2; /* above the rail's cards */
+}

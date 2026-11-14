@@ -12,6 +12,7 @@ import {
   Keyboard,
   MiniStats,
   Mouse,
+  RenderComponentSystem,
   RESOLUTION_AUTO,
   ScriptComponentSystem,
   TONEMAP_LINEAR,
@@ -81,12 +82,14 @@ export class Viewer {
   private readonly velocity = { position: new Vec3(), target: new Vec3() };
   private readonly prev = { position: new Vec3(), target: new Vec3() };
   private drift: DriftState | null = null;
+  private driver: ((dt: number) => void) | null = null;
 
   private constructor(app: AppBase, camera: Entity, controls: CameraControls) {
     this.app = app;
     this.camera = camera;
     this.controls = controls;
     app.on('update', (dt: number) => {
+      if (this.driver) return this.driver(dt); // e.g. walk mode owns the camera
       this.updateFlight(dt);
       this.updateDrift(dt);
     });
@@ -104,7 +107,7 @@ export class Viewer {
     appOptions.mouse = new Mouse(canvas);
     appOptions.touch = new TouchDevice(canvas);
     appOptions.keyboard = new Keyboard(window);
-    appOptions.componentSystems = [CameraComponentSystem, ScriptComponentSystem, GSplatComponentSystem];
+    appOptions.componentSystems = [CameraComponentSystem, ScriptComponentSystem, GSplatComponentSystem, RenderComponentSystem];
     appOptions.resourceHandlers = [TextureHandler, GSplatHandler]; // SOG chunks are WebP textures
 
     const app = new AppBase(canvas);
@@ -224,6 +227,7 @@ export class Viewer {
 
   /** Jumps the camera to a pose instantly and leaves the user in orbit mode around its target. */
   setPose(pose: Pose): void {
+    this.driver = null;
     this.drift = null;
     this.endFlight('replaced');
     this.handOver(new Vec3(...pose.position), new Vec3(...pose.target), pose.fov);
@@ -253,6 +257,7 @@ export class Viewer {
    * key released mid-flight leaves the camera drifting forever.)
    */
   flyTo(pose: Pose): Promise<FlightResult> {
+    this.driver = null;
     const from: FlightState = {
       position: this.camera.getPosition().clone(),
       target: new Vec3(...this.getPose().target),
@@ -269,6 +274,29 @@ export class Viewer {
     return new Promise((resolve) => {
       this.settleFlight = resolve;
     });
+  }
+
+  /**
+   * Hands the camera to an external per-frame driver (walk mode). Like flights it runs after
+   * CameraControls each frame, so the controls are never paused. Stops any flight or drift.
+   */
+  drive(fn: (dt: number) => void): void {
+    this.endFlight('replaced');
+    this.drift = null;
+    this.driver = fn;
+  }
+
+  /** Ends external driving and gives the camera back to the orbit controls, looking `ahead` m. */
+  release(ahead = 4): void {
+    if (!this.driver) return;
+    this.driver = null;
+    const p = this.camera.getPosition().clone();
+    const t = p.clone().add(this.camera.forward.clone().mulScalar(ahead));
+    this.handOver(p, t, this.camera.camera!.fov);
+  }
+
+  get isDriven(): boolean {
+    return this.driver !== null;
   }
 
   /** True while the camera is moving on its own (flight or idle drift). */

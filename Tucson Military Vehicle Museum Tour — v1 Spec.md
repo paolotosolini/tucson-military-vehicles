@@ -167,6 +167,16 @@ The splat fills the window over a near-black background (#09090a), with a soft v
 - After arriving, start the stop's drift: `sway` = a gentle ±1.5° side-to-side movement around the target over \~14 s; `orbit` = slow continuous orbit, 2°/s.
 - Any user input on the canvas stops the drift and hands control to the user. The active card stays selected; a "Back to view" button on the card returns to the saved pose.
 
+**Walk mode**
+
+- A **Walk** button in the bottom bar switches walk mode on and off. It starts where the camera is, keeping its direction, tilt and field of view (only the eye height eases to 1.6 m above the floor); from high up (the overview) it flies down to the floor first. Switching it off leaves the camera where it is.
+- Point at the floor: a thin white ring shows where you'd go, only on floor you could stand on. Click to walk there (straight line, no route-finding). Drag to look around; WASD to walk, Shift to run, Esc to stop. Picking a stop leaves walk mode.
+- Collision uses a 10 cm voxel grid built from the cropped scan by `tools/prepare-model.sh` (`public/collision/`, ~1 MB) and read with PlayCanvas's `VoxelOccupancy`, no physics engine: gravity onto the floor, step-ups to 45 cm, a 30 cm-radius body that slides along walls. The grid is in splat-transform's frame, the world turned 180° about Z.
+
+**Credit**
+
+- "Created by Paolo Tosolini", small at the bottom-right.
+
 **Loading**
 
 - Show the tour title and a progress indicator while the model loads. Show the carousel as soon as `stops.json` is read so thumbnails appear right away.
