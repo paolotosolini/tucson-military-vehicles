@@ -3,6 +3,7 @@ import { type Carousel, createCarousel, createNav, isTyping } from './carousel';
 import { DEV_TOGGLE_KEY, initDevMode, isLocalhost, toggleDevMode } from './devmode';
 import { ThumbStore, loadLocalEdits } from './thumbs';
 import { type Stop, Tour, loadTour } from './tour';
+import { Vec3 } from 'playcanvas';
 import { Viewer, type Pose } from './viewer';
 import { WalkMode } from './walk';
 
@@ -35,6 +36,39 @@ function showSplashImage(url: string) {
 }
 
 const ENTER_FALLBACK_MS = 10_000;
+
+// ---- Intro: the "assembly" reveal ---------------------------------------------------------
+const FLOOR_Y = -1.4; // the hangar floor, world y (see the spec, Step 0)
+const HALL_RADIUS = 75; // m: the reveal wave covers the whole hall from anywhere in it
+const INTRO_GLIDE_S = 4.5;
+const INTRO_UI_DELAY_MS = 2600;
+
+/**
+ * After ENTER: the scan starts empty; gold sparks ripple out across the floor from where the
+ * start view looks, a warm wave follows and grows them into the scan, while the camera cranes in
+ * from higher and further back to the stop's view, where its idle drift then starts.
+ */
+function playIntro(viewer: Viewer, stop: Stop) {
+  const pose = stop.camera;
+  const p = new Vec3(...pose.position);
+  const t = new Vec3(...pose.target);
+  const dir = t.clone().sub(p).normalize();
+
+  // Where the view's centre meets the floor: the wave's origin.
+  const center =
+    dir.y < -0.05
+      ? p.clone().add(dir.clone().mulScalar((FLOOR_Y - p.y) / dir.y))
+      : new Vec3(t.x, FLOOR_Y, t.z);
+
+  // Crane in: start further back along the view and higher, slightly wider.
+  const back = Math.min(8, Math.max(3, p.distance(t) * 0.3));
+  const start = p.clone().sub(dir.clone().mulScalar(back)).add(new Vec3(0, 2.5, 0));
+  viewer.setPose({ position: [start.x, start.y, start.z], target: pose.target, fov: pose.fov + 8 });
+  viewer.flyTo(pose, INTRO_GLIDE_S).then((result) => {
+    if (result === 'arrived') viewer.startDrift(stop.drift ?? 'sway', pose);
+  });
+  viewer.reveal(center, HALL_RADIUS);
+}
 
 /**
  * Resolves when the visitor presses ENTER. The button appears once the first view is fully sharp,
@@ -159,7 +193,11 @@ async function start() {
     // Then the first view sharpens; ENTER appears once it's sharp (or after 10 s, while detail
     // keeps streaming). Dev mode skips the splash.
     if (!dev) await waitForEnter(viewer);
+    const cinematic = !dev && !reducedMotion.matches;
+    if (cinematic) playIntro(viewer, tour.stop);
     loader.classList.add('is-done');
+    // Let the reveal play unobstructed, then bring in the title, bar and carousel.
+    if (cinematic) await new Promise((r) => setTimeout(r, INTRO_UI_DELAY_MS));
     ui.classList.add('is-live');
     canvas.focus();
     if (!dev) showCarouselTip(tour, carousel);

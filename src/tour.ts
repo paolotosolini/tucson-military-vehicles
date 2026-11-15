@@ -103,10 +103,6 @@ export class Tour {
       s.id = `stop-${i + 1}`;
       s.thumbnail = thumbPath(s.id);
     });
-    if (this.current >= 0) {
-      const hash = `#${this.stop.id}`;
-      if (location.hash !== hash) history.replaceState(null, '', hash);
-    }
     for (const fn of this.listListeners) fn();
   }
 
@@ -115,9 +111,14 @@ export class Tour {
     this.set(Math.max(0, Math.min(index, this.count - 1)), true);
   }
 
-  /** Activates the start stop without a flight. Call once, after listeners are attached. */
+  /**
+   * Activates the start stop without a flight. Call once, after listeners are attached.
+   * A deep link (#stop-5) is honoured once, then cleared from the address bar, so reloading
+   * always starts at the overview.
+   */
   start(): void {
     this.set(this.startIndex(), true);
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   }
 
   goTo(index: number): void {
@@ -144,9 +145,7 @@ export class Tour {
     const previous = this.current;
     this.current = index;
     const stop = this.stop;
-    // replaceState: keep the hash shareable without stacking a history entry per stop.
-    const hash = `#${encodeURIComponent(stop.id)}`;
-    if (location.hash !== hash) history.replaceState(null, '', hash);
+    // The address bar isn't updated per stop, so a reload starts at the overview again.
     for (const fn of this.listeners) fn({ index, previous, stop, initial });
   }
 }

@@ -20,3 +20,20 @@ declare module 'playcanvas/scripts/esm/camera-controls.mjs' {
     reset(focus: Vec3, position: Vec3): void;
   }
 }
+
+declare module 'playcanvas/scripts/esm/gsplat/reveal-radial.mjs' {
+  import type { Color, Script, Vec3 } from 'playcanvas';
+  export class GSplatRevealRadial extends Script {
+    center: Vec3;
+    speed: number;
+    acceleration: number;
+    delay: number;
+    dotTint: Color;
+    waveTint: Color;
+    oscillationIntensity: number;
+    endRadius: number;
+    bandWidth: number;
+    getCompletionTime(): number;
+    isEffectComplete(): boolean;
+  }
+}

@@ -22,6 +22,7 @@ import {
   createGraphicsDevice,
 } from 'playcanvas';
 import { CameraControls } from 'playcanvas/scripts/esm/camera-controls.mjs';
+import { GSplatRevealRadial } from 'playcanvas/scripts/esm/gsplat/reveal-radial.mjs';
 import { Flight, type FlightState } from './flight';
 
 export interface Pose {
@@ -259,7 +260,7 @@ export class Viewer {
    * instead is a trap: re-enabling discards pending key events but not its running key state, so a
    * key released mid-flight leaves the camera drifting forever.)
    */
-  flyTo(pose: Pose): Promise<FlightResult> {
+  flyTo(pose: Pose, duration?: number): Promise<FlightResult> {
     this.driver = null;
     const from: FlightState = {
       position: this.camera.getPosition().clone(),
@@ -267,7 +268,7 @@ export class Viewer {
       fov: this.camera.camera!.fov,
     };
     const velocity = this.flight ? this.velocity : { position: Vec3.ZERO, target: Vec3.ZERO };
-    const flight = new Flight(from, velocity, pose);
+    const flight = new Flight(from, velocity, pose, duration);
     this.endFlight('replaced');
     this.drift = null;
 
@@ -491,6 +492,31 @@ export class Viewer {
     } finally {
       cam.fov = fov;
     }
+  }
+
+  /**
+   * Plays the "assembly" reveal: the scene starts empty, gold sparks ripple out from `center`,
+   * and a warm wave follows that grows them into the full scan. Resolves when it has finished
+   * (the effect then removes itself).
+   */
+  reveal(center: Vec3, radius: number): Promise<void> {
+    const splat = this.splat;
+    if (!splat) return Promise.resolve();
+    if (!splat.script) splat.addComponent('script');
+    const fx = splat.script!.create(GSplatRevealRadial) as GSplatRevealRadial;
+    Object.assign(fx, {
+      center: center.clone(),
+      speed: 5, // m/s at the start …
+      acceleration: 8, // … speeding up, so the far end of the hall isn't a long wait
+      delay: 1.0, // the warm wave trails the sparks by a second
+      dotTint: new Color(1.0, 0.62, 0.22),
+      waveTint: new Color(1.4, 0.85, 0.35),
+      oscillationIntensity: 0.06,
+      endRadius: radius,
+      bandWidth: 1.6,
+    });
+    const ms = fx.getCompletionTime() * 1000;
+    return new Promise((resolve) => setTimeout(resolve, ms + 100));
   }
 
   get splatEntity(): Entity | null {

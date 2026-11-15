@@ -62,7 +62,12 @@ export class Flight {
   private readonly fov1: number;
   private readonly arc: number;
 
-  constructor(from: FlightState, fromVelocity: { position: Vec3; target: Vec3 }, to: Pose) {
+  constructor(
+    from: FlightState,
+    fromVelocity: { position: Vec3; target: Vec3 },
+    to: Pose,
+    duration?: number,
+  ) {
     this.p0 = from.position.clone();
     this.t0 = from.target.clone();
     this.vp0 = fromVelocity.position.clone();
@@ -73,8 +78,8 @@ export class Flight {
     this.fov1 = to.fov;
 
     const distance = this.p0.distance(this.p1);
-    this.duration = flightDuration(distance);
-    this.arc = arcHeight(distance);
+    this.duration = duration ?? flightDuration(distance);
+    this.arc = duration ? 0 : arcHeight(distance); // a timed glide (e.g. the intro) never arcs
   }
 
   get done(): boolean {

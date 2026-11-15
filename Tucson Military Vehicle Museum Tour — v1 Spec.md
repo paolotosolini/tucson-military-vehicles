@@ -154,7 +154,7 @@ The splat fills the window over a near-black background (#09090a), with a soft v
 - A Home button at the left of the bar returns to stop 1 (disabled while on stop 1). The `Home` key does the same.
 - Left/Right and Up/Down arrow keys do the same as Previous / Next; ignored while typing in a text field.
 - Stop ids run `stop-1` … `stop-10`, so the deep link matches the counter.
-- URL hash updates on each stop change (`#stop-3`). Loading a URL with a hash starts at that stop without the flight.
+- The address bar is not updated while browsing, so a reload always starts at the overview (stop 1). A deep link (`#stop-3`) opens that stop once (no flight), then the hash is removed from the address bar.
 
 **Camera transitions**
 
@@ -183,9 +183,9 @@ The splat fills the window over a near-black background (#09090a), with a soft v
 
 - A full-screen splash covers everything, carousel included, while the scan loads: the start stop's thumbnail blurred and darkened behind the museum name and location, three short hints with icons (scroll the cards on the right to visit each vehicle · drag to look around, scroll to zoom · Walk to explore on foot), and a progress bar.
 - The bar covers the coarse scan (first ~35%), then the first view sharpening. When the first view is fully sharp, an ENTER button replaces the bar. If that takes longer than 10 s, ENTER appears anyway with "Detail is still loading. You can enter now." The whole model is never waited for.
-- After ENTER the splash fades, the title, nav bar and credit fade in, and the carousel slides in from the right. Arrow keys do nothing while the splash is up.
+- After ENTER, the **assembly reveal** plays (PlayCanvas's `reveal-radial` effect, tinted gold): the scan starts empty, gold sparks ripple outward across the floor from where the start view looks, and a warm wave about a second behind grows them into the full scan (whole hall in ~4.5 s). Meanwhile the camera cranes in over 4.5 s from ~3–8 m further back, 2.5 m higher and a slightly wider lens to the stop's view, where its idle drift starts. The title, nav bar, credit and carousel (sliding in from the right) arrive after ~2.6 s. With `prefers-reduced-motion`, no reveal or crane: a plain fade. Arrow keys do nothing while the splash is up.
 - First visit only: a tip next to the carousel, "Scroll or click a card to visit a vehicle", goes away on first use (or after 12 s) and is remembered in `localStorage`.
-- Deep links (`#stop-5`) get the same splash with that stop's image. Dev mode skips the splash.
+- Deep links (`#stop-5`) get the same splash and reveal with that stop's image and view. Dev mode skips the splash.
 
 ## Dev mode
 
