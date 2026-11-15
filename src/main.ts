@@ -44,7 +44,9 @@ async function start() {
     const startStop = tour.stops[tour.startIndex()];
     const viewer = await Viewer.create({
       canvas,
-      modelUrl: new URL(data.model, new URL(base, location.href)).href,
+      // ?model= and ?budget= are for testing streaming settings; visitors never use them.
+      modelUrl: new URL(params.get('model') ?? data.model, new URL(base, location.href)).href,
+      splatBudget: Number(params.get('budget')) || undefined,
       initialPose: startStop.camera,
       showStats: params.has('stats'),
       onProgress: (f) => {

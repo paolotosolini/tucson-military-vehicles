@@ -64,6 +64,8 @@ export interface ViewerOptions {
   modelUrl: string;
   initialPose: Pose;
   showStats?: boolean;
+  /** Splats to aim for on screen (detail rises until this many are drawn). */
+  splatBudget?: number;
   /** Called with 0..1 while the first (coarse) view streams in. */
   onProgress?: (fraction: number) => void;
 }
@@ -156,7 +158,8 @@ export class Viewer {
     // Streaming / LOD settings
     const gs = app.scene.gsplat;
     gs.splatBudgetMode = GSPLAT_BUDGET_TARGET;
-    gs.splatBudget = 4_000_000;
+    // 2.5M splats on screen: same close-up look as 4M in tests, a third less drawing per frame.
+    gs.splatBudget = opts.splatBudget ?? 2_500_000;
     gs.lodBehindPenalty = 3;
     (gs as unknown as { lodUpdateAngle: number }).lodUpdateAngle = 90;
 

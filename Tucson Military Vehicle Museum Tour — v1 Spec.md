@@ -70,7 +70,9 @@ splat-transform \
   public/model/lod-meta.json --filter-nan --filter-harmonics 0
 ```
 
-Result: 252 MB in 253 files, largest 2.2 MB (LOD 0 138 MB … LOD 5 3.5 MB).
+The model is written in small streaming chunks (`--lod-chunk-count 128 --lod-chunk-extent 8`, about 1.7 MB each), so a view fetches full detail only near the camera, and the viewer aims for 2.5M splats on screen. Measured at stop 6: 58 MB until fully sharp, versus 120 MB with the default 512K-splat chunks and a 4M budget, with the same close-up look.
+
+Result: 259 MB in 907 files, largest under 2.2 MB.
 
 World facts: the hangar floor is at y ≈ −1.4 and the roof at y ≈ 5.5–6, so eye height is y ≈ 0.2. The hall runs along +Z (roughly x −20…5, z 0…61 along the capture path). The roof is cropped away, so overview poses can be above the hall, e.g. position (−26, 32, −6) looking at (−5.6, −1.4, 32).
 
