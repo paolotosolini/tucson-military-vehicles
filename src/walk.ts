@@ -56,6 +56,8 @@ export class WalkMode {
   private dragging = false;
   private downX = 0;
   private downY = 0;
+  private lastX = 0;
+  private lastY = 0;
   private hover: Vec3 | null = null; // walkable floor point under the mouse
   private goal: Vec3 | null = null; // where a click is walking us
   private stuckFrames = 0;
@@ -79,8 +81,8 @@ export class WalkMode {
       if (!this.active || e.button !== 0) return;
       this.pressed = true;
       this.dragging = false;
-      this.downX = e.clientX;
-      this.downY = e.clientY;
+      this.downX = this.lastX = e.clientX;
+      this.downY = this.lastY = e.clientY;
       canvas.setPointerCapture?.(e.pointerId);
     });
     canvas.addEventListener('pointermove', (e) => {
@@ -88,18 +90,27 @@ export class WalkMode {
       if (this.pressed && !this.dragging) {
         this.dragging = Math.hypot(e.clientX - this.downX, e.clientY - this.downY) > DRAG_THRESHOLD_PX;
       }
+      // Deltas from the last position, not movementX/Y: touch events don't reliably carry those.
+      const dx = e.clientX - this.lastX;
+      const dy = e.clientY - this.lastY;
+      this.lastX = e.clientX;
+      this.lastY = e.clientY;
       if (this.dragging) {
-        this.yaw -= e.movementX * LOOK_DEG_PER_PX;
-        this.pitch = Math.max(-80, Math.min(80, this.pitch - e.movementY * LOOK_DEG_PER_PX));
+        this.yaw -= dx * LOOK_DEG_PER_PX;
+        this.pitch = Math.max(-80, Math.min(80, this.pitch - dy * LOOK_DEG_PER_PX));
         this.hover = null;
-      } else {
+      } else if (e.pointerType === 'mouse') {
         this.hover = this.pickFloor(e.clientX, e.clientY);
       }
     });
-    const release = () => {
-      if (this.active && this.pressed && !this.dragging && this.hover) {
-        this.goal = this.hover.clone();
-        this.stuckFrames = 0;
+    const release = (e: PointerEvent) => {
+      if (this.active && this.pressed && !this.dragging) {
+        // Touch has no hover: pick the floor where the tap landed.
+        const at = e.pointerType === 'mouse' ? this.hover : this.pickFloor(e.clientX, e.clientY);
+        if (at) {
+          this.goal = at.clone();
+          this.stuckFrames = 0;
+        }
       }
       this.pressed = false;
       this.dragging = false;
@@ -216,7 +227,7 @@ export class WalkMode {
     const result = await this.viewer.flyTo({
       position: [eye.x, eye.y, eye.z],
       target: [look.x, look.y, look.z],
-      fov: cam.camera!.fov,
+      fov: this.viewer.fov,
     });
     if (result !== 'arrived' || !this.active) {
       this.active = false;

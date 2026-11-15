@@ -8,6 +8,10 @@ import { defineConfig, type Plugin } from 'vite';
  */
 function devSave(): Plugin {
   const allowed = /^(stops\.json|thumbs\/stop-\d+\.webp)$/;
+  // The dev server may be opened to the local network (to try the site on a phone); only this
+  // computer may write files.
+  const fromThisMachine = (req: { socket: { remoteAddress?: string } }) =>
+    ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '');
   return {
     name: 'tour-dev-save',
     apply: 'serve',
@@ -16,7 +20,7 @@ function devSave(): Plugin {
       server.middlewares.use('/__dev/save', async (req, res) => {
         try {
           const path = new URL(req.url ?? '', 'http://x').searchParams.get('path') ?? '';
-          if (req.method !== 'POST' || !allowed.test(path)) {
+          if (req.method !== 'POST' || !allowed.test(path) || !fromThisMachine(req)) {
             res.statusCode = 400;
             return res.end('bad request');
           }
@@ -34,7 +38,7 @@ function devSave(): Plugin {
       // Body: JSON list of thumbnail names to keep; other stop-N.webp files are deleted.
       server.middlewares.use('/__dev/prune-thumbs', async (req, res) => {
         try {
-          if (req.method !== 'POST') {
+          if (req.method !== 'POST' || !fromThisMachine(req)) {
             res.statusCode = 400;
             return res.end('bad request');
           }

@@ -93,17 +93,25 @@ export function createNav(tour: Tour, root: HTMLElement): Nav {
  * How cards are laid out:
  * - `drum`: on a cylinder rolling around a horizontal axis; looping rolls straight on (10 → 1).
  * - `flat`: a plain vertical stack, for visitors who prefer reduced motion.
+ * - `strip`: a horizontal row along the bottom of a portrait phone screen, with a gentle Cover
+ *   Flow tilt; swiped sideways.
  */
-export type RailMode = 'drum' | 'flat';
+export type RailMode = 'drum' | 'flat' | 'strip';
 
 const CARD_H = 169; // 300 × 169 ≈ 16:9 (width set in CSS)
 const GAP = 18;
 const PITCH = CARD_H + GAP;
+const STRIP_W = 196; // strip cards are narrower (width set in CSS)
+const STRIP_PITCH = STRIP_W + 14;
+/** Pixels of drag that move the rail by one card, along its axis. */
+const pitchFor = (mode: RailMode) => (mode === 'strip' ? STRIP_PITCH : PITCH);
 
 interface Placement {
+  x: number;
   y: number;
   z: number;
   rx: number; // degrees; positive tips the top edge away from the viewer
+  ry: number; // degrees; strip cards turn slightly towards the centre
   opacity: number;
 }
 
@@ -121,13 +129,26 @@ function place(mode: RailMode, d: number, count: number): Placement {
     const angle = -d * step; // cards above the centre (d < 0) rotate up and back
     const facing = Math.cos(angle);
     return {
+      x: 0,
       y: -radius * Math.sin(angle),
       z: radius * facing - radius,
       rx: (angle * 180) / Math.PI,
+      ry: 0,
       opacity: clamp((facing - 0.25) / 0.35, 0, 1),
     };
   }
-  return { y: d * PITCH, z: 0, rx: 0, opacity: clamp(4.2 - a, 0, 1) };
+  if (mode === 'strip') {
+    const t = clamp(d, -1, 1);
+    return {
+      x: d * STRIP_PITCH - Math.sign(d) * Math.min(a, 1) * 18, // neighbours tuck in a little
+      y: 0,
+      z: -Math.min(a, 1) * 70 - Math.max(0, a - 1) * 20,
+      rx: 0,
+      ry: -t * 28,
+      opacity: clamp(3.4 - a, 0, 1),
+    };
+  }
+  return { x: 0, y: d * PITCH, z: 0, rx: 0, ry: 0, opacity: clamp(4.2 - a, 0, 1) };
 }
 
 export interface CarouselOptions {
@@ -144,6 +165,8 @@ export interface Carousel {
   setTitle(index: number, title: string): void;
   /** Shows "Back to view" on the active card once the user has moved the camera themselves. */
   setTakenOver(takenOver: boolean): void;
+  /** Switches layout (e.g. drum ↔ strip when a phone rotates). */
+  setMode(mode: RailMode): void;
   onBackToView(fn: () => void): void;
 }
 
@@ -161,7 +184,7 @@ export function createCarousel(tour: Tour, root: HTMLElement, opts: CarouselOpti
   rail.appendChild(stage);
   root.appendChild(rail);
 
-  const mode = opts.mode;
+  let mode = opts.mode;
   let cards: HTMLElement[] = [];
   const backListeners: (() => void)[] = [];
 
@@ -247,7 +270,7 @@ export function createCarousel(tour: Tour, root: HTMLElement, opts: CarouselOpti
     cards.forEach((c, i) => {
       const d = offset(i);
       const p = place(mode, d, count);
-      c.style.transform = `translate(-50%, -50%) translate3d(0, ${p.y.toFixed(1)}px, ${p.z.toFixed(1)}px) rotateX(${p.rx.toFixed(2)}deg)`;
+      c.style.transform = `translate(-50%, -50%) translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, ${p.z.toFixed(1)}px) rotateX(${p.rx.toFixed(2)}deg) rotateY(${p.ry.toFixed(2)}deg)`;
       c.style.opacity = p.opacity.toFixed(3);
       c.style.zIndex = String(1000 - Math.round(Math.abs(d) * 10));
       c.style.visibility = p.opacity < 0.01 ? 'hidden' : 'visible';
@@ -337,7 +360,8 @@ export function createCarousel(tour: Tour, root: HTMLElement, opts: CarouselOpti
     'wheel',
     (e) => {
       e.preventDefault();
-      const px = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      const px = e.deltaMode === 1 ? delta * 40 : e.deltaMode === 2 ? delta * 400 : delta;
       if (px === 0) return;
       wheelDir = Math.sign(px);
       pendingSelect = false;
@@ -354,6 +378,8 @@ export function createCarousel(tour: Tour, root: HTMLElement, opts: CarouselOpti
   );
 
   // ---- drag -------------------------------------------------------------------------------
+  /** Pointer position along the rail: x for the horizontal strip, y otherwise. */
+  const axisCoord = (e: PointerEvent) => (mode === 'strip' ? e.clientX : e.clientY);
   let dragging = false;
   let dragMoved = false;
   let lastY = 0;
@@ -362,7 +388,7 @@ export function createCarousel(tour: Tour, root: HTMLElement, opts: CarouselOpti
     if (e.button !== 0) return;
     dragging = true;
     dragMoved = false;
-    lastY = e.clientY;
+    lastY = axisCoord(e);
     clearTimeout(wheelTimer);
     pendingSelect = false;
     vel = 0; // catch the rail
@@ -371,15 +397,15 @@ export function createCarousel(tour: Tour, root: HTMLElement, opts: CarouselOpti
   });
   window.addEventListener('pointermove', (e) => {
     if (!dragging) return;
-    const dy = e.clientY - lastY;
+    const dy = axisCoord(e) - lastY;
     if (!dragMoved && Math.abs(dy) < 6) return;
     if (!dragMoved) {
       dragMoved = true;
       rail.setPointerCapture?.(e.pointerId);
       rail.classList.add('is-dragging');
     }
-    lastY = e.clientY;
-    pos = target = bound(pos - dy / PITCH);
+    lastY = axisCoord(e);
+    pos = target = bound(pos - dy / pitchFor(mode));
     const now = performance.now();
     samples.push({ t: now, pos });
     while (samples.length > 2 && now - samples[0].t > 100) samples.shift();
@@ -437,7 +463,14 @@ export function createCarousel(tour: Tour, root: HTMLElement, opts: CarouselOpti
     else tour.goTo(Number(hit.card.dataset.index));
   });
 
-  rail.dataset.mode = mode;
+  const applyMode = (m: RailMode) => {
+    mode = m;
+    rail.dataset.mode = m;
+    pos = target = tour.index >= 0 ? tour.index : pos;
+    vel = 0;
+    layout();
+  };
+  applyMode(mode);
   render();
 
   return {
@@ -450,6 +483,7 @@ export function createCarousel(tour: Tour, root: HTMLElement, opts: CarouselOpti
       c.setAttribute('aria-label', `Stop ${i + 1}: ${title}`);
     },
     setTakenOver: (on) => rail.classList.toggle('is-taken-over', on),
+    setMode: applyMode,
     onBackToView: (fn) => backListeners.push(fn),
   };
 }

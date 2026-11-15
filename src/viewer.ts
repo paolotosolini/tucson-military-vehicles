@@ -70,6 +70,10 @@ export interface ViewerOptions {
   splatBudget?: number;
   /** The camera never goes below this height (world y): keeps it above the floor. */
   minCameraY?: number;
+  /** Highest device pixel ratio to render at (lower = faster). Default 1.5. */
+  maxPixelRatio?: number;
+  /** Finest LOD level to stream (0 = full detail; 1 skips the finest level, about half the data). */
+  lodMin?: number;
   /** Called with 0..1 while the first (coarse) view streams in. */
   onProgress?: (fraction: number) => void;
 }
@@ -89,6 +93,7 @@ export class Viewer {
   private readonly prev = { position: new Vec3(), target: new Vec3() };
   private drift: DriftState | null = null;
   private driver: ((dt: number) => void) | null = null;
+  private logicalFov = 60;
   minCameraY = -Infinity;
 
   private constructor(app: AppBase, camera: Entity, controls: CameraControls) {
@@ -96,6 +101,7 @@ export class Viewer {
     this.camera = camera;
     this.controls = controls;
     app.on('update', (dt: number) => {
+      this.applyFov(); // follows rotation / resizes
       if (this.driver) return this.driver(dt); // e.g. walk mode owns the camera
       this.updateFlight(dt);
       this.updateDrift(dt);
@@ -128,7 +134,7 @@ export class Viewer {
     // Cap pixel ratio: retina at full DPR is ~4x the fragment work for little visible gain on splats.
     const applyResolution = () => {
       const dpr = window.devicePixelRatio || 1;
-      device.maxPixelRatio = Math.min(dpr, 1.5);
+      device.maxPixelRatio = Math.min(dpr, opts.maxPixelRatio ?? 1.5);
       app.resizeCanvas();
     };
     applyResolution();
@@ -184,7 +190,7 @@ export class Viewer {
     const viewer = new Viewer(app, camera, controls);
     viewer.minCameraY = opts.minCameraY ?? -Infinity;
     viewer.setPose(opts.initialPose);
-    await viewer.loadSplat(opts.modelUrl, opts.onProgress);
+    await viewer.loadSplat(opts.modelUrl, opts.onProgress, opts.lodMin ?? 0);
     return viewer;
   }
 
@@ -192,7 +198,7 @@ export class Viewer {
    * Loads the streamed model. Resolves once the coarsest LOD around the start view is on screen,
    * then lifts the LOD cap so finer detail streams in behind it.
    */
-  private async loadSplat(url: string, onProgress?: (f: number) => void): Promise<void> {
+  private async loadSplat(url: string, onProgress?: (f: number) => void, lodMin = 0): Promise<void> {
     const app = this.app;
     const asset = new Asset('scan', 'gsplat', { url });
     app.assets.add(asset);
@@ -235,7 +241,7 @@ export class Viewer {
         if (ready && loading === 0) {
           system.off('frame:ready', onFrameReady);
           onProgress?.(1);
-          gsplat.lodRangeMin = 0;
+          gsplat.lodRangeMin = Math.min(lodMin, levels - 1);
           gsplat.lodRangeMax = levels - 1;
           resolve();
         }
@@ -258,7 +264,7 @@ export class Viewer {
     const t = this.flight
       ? this.state.target
       : (this.controls as unknown as ControlsInternals)._pose.getFocus(new Vec3());
-    return { position: [p.x, p.y, p.z], target: [t.x, t.y, t.z], fov: this.camera.camera!.fov };
+    return { position: [p.x, p.y, p.z], target: [t.x, t.y, t.z], fov: this.fov };
   }
 
   get isFlying(): boolean {
@@ -280,7 +286,7 @@ export class Viewer {
     const from: FlightState = {
       position: this.camera.getPosition().clone(),
       target: new Vec3(...this.getPose().target),
-      fov: this.camera.camera!.fov,
+      fov: this.fov,
     };
     const velocity = this.flight ? this.velocity : { position: Vec3.ZERO, target: Vec3.ZERO };
     const flight = new Flight(from, velocity, pose, duration);
@@ -311,11 +317,39 @@ export class Viewer {
     this.driver = null;
     const p = this.camera.getPosition().clone();
     const t = p.clone().add(this.camera.forward.clone().mulScalar(ahead));
-    this.handOver(p, t, this.camera.camera!.fov);
+    this.handOver(p, t, this.fov);
   }
 
   get isDriven(): boolean {
     return this.driver !== null;
+  }
+
+  /**
+   * The view's field of view, in degrees, as authored: the vertical FOV of a 16:9 view. On a
+   * portrait screen the camera instead keeps the horizontal FOV that 16:9 view would have, so a
+   * stop shows the same width of the scene (more above and below) instead of a narrow zoomed slice.
+   */
+  get fov(): number {
+    return this.logicalFov;
+  }
+  set fov(value: number) {
+    this.logicalFov = value;
+    this.applyFov();
+  }
+
+  private applyFov(): void {
+    const cam = this.camera.camera!;
+    const canvas = this.app.graphicsDevice.canvas;
+    const portrait = canvas.height > canvas.width;
+    if (portrait) {
+      const half = (this.logicalFov * Math.PI) / 360;
+      const hfov = (Math.atan(Math.tan(half) * (16 / 9)) * 360) / Math.PI;
+      if (!cam.horizontalFov) cam.horizontalFov = true;
+      if (cam.fov !== hfov) cam.fov = hfov;
+    } else {
+      if (cam.horizontalFov) cam.horizontalFov = false;
+      if (cam.fov !== this.logicalFov) cam.fov = this.logicalFov;
+    }
   }
 
   /** True while the camera is moving on its own (flight or idle drift). */
@@ -397,7 +431,7 @@ export class Viewer {
 
     this.camera.setPosition(st.position);
     this.camera.lookAt(st.target);
-    this.camera.camera!.fov = st.fov;
+    this.fov = st.fov;
 
     if (flight.done) {
       this.endFlight('arrived');
@@ -417,7 +451,7 @@ export class Viewer {
 
   /** Places the camera and syncs CameraControls so the user continues from exactly this view. */
   private handOver(position: Vec3, target: Vec3, fov: number): void {
-    this.camera.camera!.fov = fov;
+    this.fov = fov;
     this.camera.setPosition(position);
     this.camera.lookAt(target);
 
@@ -475,16 +509,15 @@ export class Viewer {
    */
   async captureImage(width = 640, height = 360, type = 'image/webp', quality = 0.8): Promise<Blob> {
     const src = this.app.graphicsDevice.canvas as HTMLCanvasElement;
-    const cam = this.camera.camera!;
     const aspect = width / height;
     const nextFrame = () => new Promise<void>((r) => this.app.once('frameend', () => r()));
 
-    const fov = cam.fov;
+    const fov = this.fov;
     const cropH = Math.min(src.height, src.width / aspect);
     const widen = src.height / cropH; // > 1 when the window is taller than 16:9
     if (widen > 1.001) {
       const half = (fov * Math.PI) / 360;
-      cam.fov = (Math.atan(Math.tan(half) * widen) * 360) / Math.PI;
+      this.fov = (Math.atan(Math.tan(half) * widen) * 360) / Math.PI;
       await nextFrame();
     }
     try {
@@ -505,7 +538,7 @@ export class Viewer {
         out.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode image'))), type, quality),
       );
     } finally {
-      cam.fov = fov;
+      this.fov = fov;
     }
   }
 

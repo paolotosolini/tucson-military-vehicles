@@ -17,7 +17,7 @@ v1 is a desktop web page that shows a Gaussian splat scan of the Tucson Military
 - Deep link per stop (`#stop-3`)
 - Dev mode to capture poses, type text, and export `stops.json` + thumbnails
 
-**Out of scope for v1:** mobile layout, audio, archival media, gamification, hotspots placed in 3D, written history text.
+**Out of scope for v1:** audio, archival media, gamification, hotspots placed in 3D, written history text.
 
 ## Tech stack and repo structure
 
@@ -190,6 +190,15 @@ The splat fills the window over a near-black background (#09090a), with a soft v
 - After ENTER, the **assembly reveal** plays (PlayCanvas's `reveal-radial` effect, tinted gold): the scan starts empty, gold sparks ripple outward across the floor from where the start view looks, and a warm wave about a second behind grows them into the full scan (whole hall in ~4.5 s). Meanwhile the camera cranes in over 4.5 s from ~3–8 m further back, 2.5 m higher and a slightly wider lens to the stop's view, where its idle drift starts. The title, nav bar, credit and carousel (sliding in from the right) arrive after ~2.6 s. With `prefers-reduced-motion`, no reveal or crane: a plain fade. Arrow keys do nothing while the splash is up.
 - First visit only: a tip next to the carousel, "Scroll or click a card to visit a vehicle", goes away on first use (or after 12 s) and is remembered in `localStorage`.
 - Deep links (`#stop-5`) get the same splash and reveal with that stop's image and view. Dev mode skips the splash.
+
+## Phones and tablets
+
+- **Detection:** a touch-first device (`pointer: coarse`) whose shorter screen side is at most 820 px gets the phone profile: 1M splats on screen (desktop 2.5M), pixel density capped at 1.25 (desktop 1.5), and the finest LOD level skipped (`lodRangeMin` 1), about half the data per view.
+- **Portrait (≤ 700 px wide):** the carousel becomes a horizontal strip of 196 px cards along the bottom (Cover Flow tilt, swipe with the same spring physics, select on settle, tap to select; no looping). The nav bar sits just above it (Walk as an icon), the title top-left with the credit under it. Rotating to landscape switches to the side drum and back.
+- **Field of view on tall screens:** stops are framed for 16:9. On a portrait screen the camera keeps the horizontal field of view a 16:9 view would have (PlayCanvas `horizontalFov`), so each stop shows the same width of the scene with more above and below, instead of a narrow zoomed slice.
+- **Touch:** one finger orbits, two fingers pinch-zoom and pan (PlayCanvas camera controls). In walk mode a tap on the floor walks there and dragging looks around. Splash, tip and walk-hint wording say swipe / tap / pinch.
+- **Testing on a phone:** `npm run dev` serves on the local network (`--host`); the dev-mode save endpoint only accepts writes from the computer itself. Over plain http phones use WebGL; the live https site can use WebGPU.
+- Tested on an iPhone 17 Pro: smooth; gestures, walk, strip and rotation all work.
 
 ## Dev mode
 

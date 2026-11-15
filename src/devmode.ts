@@ -112,7 +112,7 @@ export function initDevMode(ctx: DevContext): void {
     fovVal.textContent = `${p.fov.toFixed(0)}°`;
   });
   fovInput.addEventListener('input', () => {
-    viewer.camera.camera!.fov = Number(fovInput.value);
+    viewer.fov = Number(fovInput.value);
   });
 
   // ---------------------------------------------------------------- saving

@@ -8,6 +8,17 @@ import { Viewer, type Pose } from './viewer';
 import { WalkMode } from './walk';
 
 const base = import.meta.env.BASE_URL;
+
+// ---- Device profile ------------------------------------------------------------------------
+/** A touch-first device (phone or small tablet). */
+const touch = window.matchMedia('(pointer: coarse)').matches;
+/** Phones get a lighter rendering profile: fewer splats, lower pixel density, no finest LOD. */
+const phone = touch && Math.min(screen.width, screen.height) <= 820;
+/** Portrait phone screens use the horizontal card strip along the bottom. */
+const portraitNarrow = window.matchMedia('(orientation: portrait) and (max-width: 700px)');
+const PROFILE = phone
+  ? { splatBudget: 1_000_000, maxPixelRatio: 1.25, lodMin: 1 }
+  : { splatBudget: undefined, maxPixelRatio: undefined, lodMin: 0 };
 const params = new URLSearchParams(location.search);
 /** Dev mode (tour authoring) is only ever on with ?dev=1. */
 const dev = params.get('dev') === '1';
@@ -36,6 +47,20 @@ function showSplashImage(url: string) {
 }
 
 const ENTER_FALLBACK_MS = 10_000;
+
+/** Splash hints for touch screens. */
+function useTouchWording() {
+  const items = loader.querySelectorAll('.loader__hints li span');
+  const lines = [
+    `<strong>Swipe the cards</strong> ${portraitNarrow.matches ? 'below' : 'on the right'} to visit each vehicle`,
+    '<strong>Drag</strong> to look around, <strong>pinch</strong> to zoom',
+    '<strong>Walk</strong>, then tap the floor to explore on foot',
+  ];
+  items.forEach((el, i) => (el.innerHTML = lines[i]));
+  // a fingertip instead of the mouse icon
+  const icon = loader.querySelectorAll('.loader__hints li svg')[1];
+  if (icon) icon.innerHTML = '<path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V10m0-.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-.5a5 5 0 0 1-4.2-2.3L5 16a1.5 1.5 0 0 1 2.4-1.8L9 15.5"/>';
+}
 
 // ---- Intro: the "assembly" reveal ---------------------------------------------------------
 const FLOOR_Y = -1.4; // the hangar floor, world y (see the spec, Step 0)
@@ -111,7 +136,7 @@ function showCarouselTip(tour: Tour, carousel: Carousel) {
   const tip = document.createElement('div');
   tip.className = 'carousel-tip';
   tip.setAttribute('role', 'note');
-  tip.innerHTML = `Scroll or click a card to visit a vehicle
+  tip.innerHTML = `${touch ? 'Swipe or tap a card' : 'Scroll or click a card'} to visit a vehicle
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>`;
   ui.appendChild(tip);
   requestAnimationFrame(() => tip.classList.add('is-on'));
@@ -147,6 +172,8 @@ async function start() {
     ui.querySelector('.brand__title')!.textContent = data.title;
     ui.querySelector('.brand__subtitle')!.textContent = data.subtitle;
 
+    if (touch) useTouchWording();
+
     // The splash shows the start stop's thumbnail, blurred, while the scan loads.
     const startStop = tour.stops[tour.startIndex()];
     showSplashImage(thumbs.url(startStop));
@@ -157,20 +184,25 @@ async function start() {
     // The drum; visitors who prefer reduced motion get a plain list instead.
     const carousel = createCarousel(tour, ui, {
       thumbUrl: (stop) => thumbs.url(stop),
-      mode: reducedMotion.matches ? 'flat' : 'drum',
+      mode: railMode(),
     });
 
     const viewer = await Viewer.create({
       canvas,
       // ?model= and ?budget= are for testing streaming settings; visitors never use them.
       modelUrl: new URL(params.get('model') ?? data.model, new URL(base, location.href)).href,
-      splatBudget: Number(params.get('budget')) || undefined,
+      splatBudget: Number(params.get('budget')) || PROFILE.splatBudget,
+      maxPixelRatio: PROFILE.maxPixelRatio,
+      lodMin: PROFILE.lodMin,
       minCameraY: FLOOR_Y + 0.3,
       initialPose: startStop.camera,
       showStats: params.has('stats'),
       // First, the coarse scan: the first 35% of the bar.
       onProgress: (f) => setProgress(0.35 * f),
     });
+
+    // Rotating a phone switches between the bottom strip and the side drum.
+    portraitNarrow.addEventListener('change', () => carousel.setMode(railMode()));
 
     wireTransitions(tour, viewer, canvas, carousel);
     const walk = new WalkMode(viewer, canvas, `${base}collision/hangar`);
@@ -212,6 +244,12 @@ async function start() {
 }
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+/** The carousel layout for the current screen: a bottom strip on portrait phones, else the drum. */
+function railMode() {
+  if (portraitNarrow.matches) return 'strip' as const;
+  return reducedMotion.matches ? ('flat' as const) : ('drum' as const);
+}
 const FADE_MS = 150; // each half of the 300 ms reduced-motion cross-fade
 
 
@@ -289,7 +327,9 @@ function wireWalk(walk: WalkMode, nav: HTMLElement, tour: Tour, carousel: Carous
 
   const hint = document.createElement('div');
   hint.className = 'walk-hint';
-  hint.innerHTML = 'Click the floor to walk there · drag to look · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk · <kbd>Esc</kbd> stop';
+  hint.innerHTML = touch
+    ? 'Tap the floor to walk there · drag to look'
+    : 'Click the floor to walk there · drag to look · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk · <kbd>Esc</kbd> stop';
   nav.parentElement!.appendChild(hint);
 
   walk.onChange((on) => {
