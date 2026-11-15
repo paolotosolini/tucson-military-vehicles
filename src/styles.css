@@ -26,28 +26,97 @@ html, body {
   touch-action: none;
 }
 
+/* ---- Splash: covers everything (carousel included) until the visitor presses ENTER ---- */
 .loader {
   position: fixed;
-  inset: 0 340px 0 0; /* the carousel rail stays visible while the model loads */
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #09090a;
+  transition: opacity 700ms ease, visibility 0s 700ms;
+  z-index: 20;
+}
+.loader.is-done { opacity: 0; visibility: hidden; pointer-events: none; }
+
+/* the start stop's thumbnail, blurred and darkened */
+.loader__bg {
+  position: absolute;
+  inset: -40px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(9px) brightness(0.62) saturate(0.95);
+  transform: scale(1.05);
+  opacity: 0;
+  transition: opacity 1200ms ease;
+}
+.loader__bg.is-loaded { opacity: 1; }
+.loader::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(9, 9, 10, 0.35), rgba(9, 9, 10, 0.8) 80%);
+}
+
+.loader__content {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  background: radial-gradient(ellipse at center, #3a2e24 0%, #17120e 100%);
-  transition: opacity 600ms ease;
-  z-index: 10;
+  text-align: center;
+  padding: 24px;
+  max-width: 640px;
 }
-.loader.is-done { opacity: 0; pointer-events: none; }
-
 .loader__title {
   margin: 0;
-  font-size: clamp(2rem, 4vw, 3.25rem);
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: clamp(2rem, 4.5vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
 }
-.loader__subtitle { margin: 0 0 1.5rem; color: var(--ink-dim); }
+.loader__subtitle {
+  margin: 0.6rem 0 2.2rem;
+  color: var(--accent);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+}
 
+.loader__hints {
+  list-style: none;
+  margin: 0 0 2.4rem;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  text-align: left;
+}
+.loader__hints li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--ink-dim);
+  font-size: 1rem;
+}
+.loader__hints strong { color: var(--ink); font-weight: 600; }
+.loader__hints svg {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 5px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* the progress bar, which the ENTER button replaces when ready */
+.loader__action { height: 52px; display: grid; place-items: center; }
 .loader__bar {
   width: min(320px, 60vw);
   height: 4px;
@@ -59,10 +128,32 @@ html, body {
   height: 100%;
   width: 0%;
   background: var(--accent);
-  transition: width 200ms ease;
+  transition: width 300ms ease;
 }
-.loader__label { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--ink-dim); }
+.loader__enter {
+  min-width: 200px;
+  height: 52px;
+  padding: 0 36px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #1b140e;
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 8px 30px rgba(224, 164, 88, 0.35);
+  animation: enter-in 500ms ease;
+  transition: transform 150ms ease, filter 150ms ease;
+}
+.loader__enter:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.loader__enter:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+@keyframes enter-in { from { opacity: 0; transform: scale(0.94); } }
+.loader.is-ready .loader__bar { display: none; }
 
+.loader__label { margin: 0.9rem 0 0; min-height: 1.2em; font-size: 0.85rem; color: var(--ink-dim); }
 .loader.is-error .loader__fill { background: #c0503a; width: 100%; }
 
 /* ---- Tour UI ---- */
@@ -71,12 +162,14 @@ html, body {
   inset: 0;
   pointer-events: none; /* the canvas stays explorable; controls opt back in */
   opacity: 0;
-  transition: opacity 600ms ease 200ms;
+  visibility: hidden;
+  transition: opacity 600ms ease 150ms, visibility 0s 750ms;
   z-index: 11;
 }
-.ui.is-ready { opacity: 1; }
-.ui .nav { opacity: 0; visibility: hidden; transition: opacity 600ms ease 200ms, visibility 0s 800ms; }
-.ui.is-live .nav { opacity: 1; visibility: visible; transition-delay: 200ms, 0s; }
+/* Everything appears together after ENTER; the carousel slides in from the right. */
+.ui.is-live { opacity: 1; visibility: visible; transition-delay: 150ms, 0s; }
+.ui .rail { transform: translateX(60px); transition: transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1) 250ms; }
+.ui.is-live .rail { transform: none; }
 
 .nav {
   position: absolute;
@@ -440,3 +533,36 @@ kbd {
   pointer-events: none;
   z-index: 2; /* above the rail's cards */
 }
+
+/* ---- One-time carousel tip ---- */
+.carousel-tip {
+  position: absolute;
+  right: 356px;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 10px 18px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #1b140e;
+  font-weight: 600;
+  font-size: 0.92rem;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  transform: translate(-12px, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 350ms ease, transform 350ms ease;
+}
+.carousel-tip.is-on { opacity: 1; transform: translate(0, -50%); transition-delay: 900ms; }
+.carousel-tip svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: nudge 1.2s ease-in-out infinite;
+}
+@keyframes nudge { 50% { transform: translateX(4px); } }

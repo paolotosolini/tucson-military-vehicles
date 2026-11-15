@@ -74,6 +74,7 @@ export function createNav(tour: Tour, root: HTMLElement): Nav {
   const onKey = (e: KeyboardEvent) => {
     const dir = KEYS[e.key];
     if (!dir || e.altKey || e.ctrlKey || e.metaKey || isTyping(e.target)) return;
+    if (!root.classList.contains('is-live')) return; // still on the splash screen
     e.preventDefault();
     e.stopImmediatePropagation();
     if (e.type === 'keydown') tour[dir]();

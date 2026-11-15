@@ -179,9 +179,13 @@ The splat fills the window over a near-black background (#09090a), with a soft v
 
 - "Created by Paolo Tosolini", small at the bottom-right.
 
-**Loading**
+**Opening (splash screen)**
 
-- Show the tour title and a progress indicator while the model loads. Show the carousel as soon as `stops.json` is read so thumbnails appear right away.
+- A full-screen splash covers everything, carousel included, while the scan loads: the start stop's thumbnail blurred and darkened behind the museum name and location, three short hints with icons (scroll the cards on the right to visit each vehicle · drag to look around, scroll to zoom · Walk to explore on foot), and a progress bar.
+- The bar covers the coarse scan (first ~35%), then the first view sharpening. When the first view is fully sharp, an ENTER button replaces the bar. If that takes longer than 10 s, ENTER appears anyway with "Detail is still loading. You can enter now." The whole model is never waited for.
+- After ENTER the splash fades, the title, nav bar and credit fade in, and the carousel slides in from the right. Arrow keys do nothing while the splash is up.
+- First visit only: a tip next to the carousel, "Scroll or click a card to visit a vehicle", goes away on first use (or after 12 s) and is remembered in `localStorage`.
+- Deep links (`#stop-5`) get the same splash with that stop's image. Dev mode skips the splash.
 
 ## Dev mode
 

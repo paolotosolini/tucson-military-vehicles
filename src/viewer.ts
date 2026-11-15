@@ -421,7 +421,7 @@ export class Viewer {
    * `timeoutMs`, so a capture never hangs). Waits a few frames first so LOD selection catches up
    * with a camera that just moved.
    */
-  async waitForDetail(timeoutMs = 10000): Promise<void> {
+  async waitForDetail(timeoutMs = 10000, onProgress?: (fraction: number) => void): Promise<void> {
     const frames = (n: number) =>
       new Promise<void>((r) => {
         const tick = () => (--n <= 0 ? r() : this.app.once('frameend', tick));
@@ -438,8 +438,12 @@ export class Viewer {
         system.off('frame:ready', onReady);
         resolve();
       };
+      let peak = 0;
       const onReady = (...args: unknown[]) => {
-        if (args[2] === true && args[3] === 0) done();
+        const loading = args[3] as number;
+        peak = Math.max(peak, loading);
+        if (peak > 0) onProgress?.(1 - loading / peak);
+        if (args[2] === true && loading === 0) done();
       };
       const timer = setTimeout(done, timeoutMs);
       system.on('frame:ready', onReady);

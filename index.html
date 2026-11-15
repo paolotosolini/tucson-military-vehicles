@@ -7,11 +7,31 @@
   </head>
   <body>
     <canvas id="app"></canvas>
-    <div id="loader" class="loader" role="status" aria-live="polite">
-      <h1 class="loader__title">Tucson Military Vehicle Museum</h1>
-      <p class="loader__subtitle">Tucson, Arizona</p>
-      <div class="loader__bar"><div class="loader__fill"></div></div>
-      <p class="loader__label">Loading scan…</p>
+    <div id="loader" class="loader">
+      <div class="loader__bg" aria-hidden="true"></div>
+      <div class="loader__content">
+        <h1 class="loader__title">Tucson Military Vehicle Museum</h1>
+        <p class="loader__subtitle">Tucson, Arizona</p>
+        <ul class="loader__hints">
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="7" rx="1.5"/><rect x="6" y="14" width="12" height="7" rx="1.5"/><path d="M21 9v6M19.5 10.5 21 9l1.5 1.5M19.5 13.5 21 15l1.5-1.5"/></svg>
+            <span><strong>Scroll the cards</strong> on the right to visit each vehicle</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="16" rx="5"/><path d="M12 7v3"/></svg>
+            <span><strong>Drag</strong> to look around, <strong>scroll</strong> to zoom</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="4" r="2"/><path d="M9 21l2-6 3 3v3M7 12l3-4 4 1 2 3M10 8l1 7"/></svg>
+            <span><strong>Walk</strong> to explore the hall on foot</span>
+          </li>
+        </ul>
+        <div class="loader__action">
+          <div class="loader__bar" role="progressbar" aria-label="Loading the scan" aria-valuemin="0" aria-valuemax="100"><div class="loader__fill"></div></div>
+          <button class="loader__enter" type="button" hidden>Enter</button>
+        </div>
+        <p class="loader__label" aria-live="polite">Loading the scan…</p>
+      </div>
     </div>
     <div class="vignette" aria-hidden="true"></div>
     <div id="ui" class="ui">

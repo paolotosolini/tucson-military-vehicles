@@ -13,8 +13,89 @@ const dev = params.get('dev') === '1';
 
 const loader = document.getElementById('loader')!;
 const fill = loader.querySelector<HTMLElement>('.loader__fill')!;
+const bar = loader.querySelector<HTMLElement>('.loader__bar')!;
 const label = loader.querySelector<HTMLElement>('.loader__label')!;
+const enterBtn = loader.querySelector<HTMLButtonElement>('.loader__enter')!;
 const ui = document.getElementById('ui')!;
+
+const setProgress = (f: number) => {
+  const pct = Math.round(Math.min(1, Math.max(0, f)) * 100);
+  fill.style.width = `${pct}%`;
+  bar.setAttribute('aria-valuenow', String(pct));
+};
+
+function showSplashImage(url: string) {
+  const bg = loader.querySelector<HTMLElement>('.loader__bg')!;
+  const img = new Image();
+  img.onload = () => {
+    bg.style.backgroundImage = `url("${url}")`;
+    bg.classList.add('is-loaded');
+  };
+  img.src = url;
+}
+
+const ENTER_FALLBACK_MS = 10_000;
+
+/**
+ * Resolves when the visitor presses ENTER. The button appears once the first view is fully sharp,
+ * or after ENTER_FALLBACK_MS so nobody waits on a slow connection (detail keeps streaming).
+ */
+function waitForEnter(viewer: Viewer): Promise<void> {
+  label.textContent = 'Sharpening the first view…';
+  let shown = false;
+  const show = (sharp: boolean) => {
+    if (shown) {
+      if (sharp) label.textContent = '';
+      return;
+    }
+    shown = true;
+    loader.classList.add('is-ready');
+    enterBtn.hidden = false;
+    enterBtn.focus({ preventScroll: true });
+    label.textContent = sharp ? '' : 'Detail is still loading. You can enter now.';
+  };
+  const fallback = window.setTimeout(() => show(false), ENTER_FALLBACK_MS);
+  viewer
+    .waitForDetail(120_000, (f) => setProgress(0.35 + 0.65 * f))
+    .then(() => {
+      clearTimeout(fallback);
+      setProgress(1);
+      show(true);
+    });
+  return new Promise((resolve) => enterBtn.addEventListener('click', () => resolve(), { once: true }));
+}
+
+const TIP_KEY = 'tmvm-carousel-tip-seen';
+
+/** A one-time hint pointing at the carousel; gone on first use, never shown again. */
+function showCarouselTip(tour: Tour, carousel: Carousel) {
+  try {
+    if (localStorage.getItem(TIP_KEY)) return;
+  } catch {
+    /* storage blocked: show it anyway */
+  }
+  const tip = document.createElement('div');
+  tip.className = 'carousel-tip';
+  tip.setAttribute('role', 'note');
+  tip.innerHTML = `Scroll or click a card to visit a vehicle
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>`;
+  ui.appendChild(tip);
+  requestAnimationFrame(() => tip.classList.add('is-on'));
+
+  const dismiss = () => {
+    tip.classList.remove('is-on');
+    setTimeout(() => tip.remove(), 400);
+    try {
+      localStorage.setItem(TIP_KEY, '1');
+    } catch {
+      /* fine */
+    }
+  };
+  tour.onChange(dismiss);
+  carousel.el.addEventListener('wheel', dismiss, { once: true, passive: true });
+  carousel.el.addEventListener('pointerdown', dismiss, { once: true });
+  setTimeout(dismiss, 12_000);
+}
 
 async function start() {
   const canvas = document.getElementById('app') as HTMLCanvasElement;
@@ -32,16 +113,19 @@ async function start() {
     ui.querySelector('.brand__title')!.textContent = data.title;
     ui.querySelector('.brand__subtitle')!.textContent = data.subtitle;
 
-    // UI is built straight away (the carousel's thumbnails can load while the model streams).
+    // The splash shows the start stop's thumbnail, blurred, while the scan loads.
+    const startStop = tour.stops[tour.startIndex()];
+    showSplashImage(thumbs.url(startStop));
+
+    // The UI is built now (so thumbnails load while the model streams) but stays hidden under the
+    // splash until the visitor presses ENTER.
     const nav = createNav(tour, ui);
     // The drum; visitors who prefer reduced motion get a plain list instead.
     const carousel = createCarousel(tour, ui, {
       thumbUrl: (stop) => thumbs.url(stop),
       mode: reducedMotion.matches ? 'flat' : 'drum',
     });
-    ui.classList.add('is-ready');
 
-    const startStop = tour.stops[tour.startIndex()];
     const viewer = await Viewer.create({
       canvas,
       // ?model= and ?budget= are for testing streaming settings; visitors never use them.
@@ -49,9 +133,8 @@ async function start() {
       splatBudget: Number(params.get('budget')) || undefined,
       initialPose: startStop.camera,
       showStats: params.has('stats'),
-      onProgress: (f) => {
-        fill.style.width = `${Math.round(f * 100)}%`;
-      },
+      // First, the coarse scan: the first 35% of the bar.
+      onProgress: (f) => setProgress(0.35 * f),
     });
 
     wireTransitions(tour, viewer, canvas, carousel);
@@ -73,9 +156,13 @@ async function start() {
       });
     }
 
+    // Then the first view sharpens; ENTER appears once it's sharp (or after 10 s, while detail
+    // keeps streaming). Dev mode skips the splash.
+    if (!dev) await waitForEnter(viewer);
     loader.classList.add('is-done');
     ui.classList.add('is-live');
     canvas.focus();
+    if (!dev) showCarouselTip(tour, carousel);
     // Handy for debugging in the console.
     Object.assign(window, { viewer, tour, thumbs });
   } catch (err) {
