@@ -165,6 +165,7 @@ async function start() {
       // ?model= and ?budget= are for testing streaming settings; visitors never use them.
       modelUrl: new URL(params.get('model') ?? data.model, new URL(base, location.href)).href,
       splatBudget: Number(params.get('budget')) || undefined,
+      minCameraY: FLOOR_Y + 0.3,
       initialPose: startStop.camera,
       showStats: params.has('stats'),
       // First, the coarse scan: the first 35% of the bar.

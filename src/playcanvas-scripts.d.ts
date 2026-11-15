@@ -12,6 +12,7 @@ declare module 'playcanvas/scripts/esm/camera-controls.mjs' {
     rotateSpeed: number;
     zoomSpeed: number;
     sceneSize: number;
+    pitchRange: import('playcanvas').Vec2;
     leftButton: 'orbit' | 'pan' | 'look';
     middleButton: 'orbit' | 'pan' | 'look';
     rightButton: 'orbit' | 'pan' | 'look';

@@ -18,6 +18,7 @@ import {
   TONEMAP_LINEAR,
   TextureHandler,
   TouchDevice,
+  Vec2,
   Vec3,
   createGraphicsDevice,
 } from 'playcanvas';
@@ -67,6 +68,8 @@ export interface ViewerOptions {
   showStats?: boolean;
   /** Splats to aim for on screen (detail rises until this many are drawn). */
   splatBudget?: number;
+  /** The camera never goes below this height (world y): keeps it above the floor. */
+  minCameraY?: number;
   /** Called with 0..1 while the first (coarse) view streams in. */
   onProgress?: (fraction: number) => void;
 }
@@ -86,6 +89,7 @@ export class Viewer {
   private readonly prev = { position: new Vec3(), target: new Vec3() };
   private drift: DriftState | null = null;
   private driver: ((dt: number) => void) | null = null;
+  minCameraY = -Infinity;
 
   private constructor(app: AppBase, camera: Entity, controls: CameraControls) {
     this.app = app;
@@ -95,6 +99,9 @@ export class Viewer {
       if (this.driver) return this.driver(dt); // e.g. walk mode owns the camera
       this.updateFlight(dt);
       this.updateDrift(dt);
+      // Orbit and pan can still dip low; hold the camera at the floor height.
+      const p = this.camera.getPosition();
+      if (p.y < this.minCameraY) this.camera.setPosition(p.x, this.minCameraY, p.z);
     });
   }
 
@@ -155,6 +162,13 @@ export class Viewer {
       rightButton: 'pan',
       middleButton: 'look',
     });
+    // Orbiting can't swing round underneath the scene: at most a slight upward look.
+    controls.pitchRange = new Vec2(-89, 15);
+    if (opts.minCameraY !== undefined) {
+      // Flying (WASD/QE) stops at the floor height natively.
+      const fly = (controls as unknown as { _flyController: { _targetPose: { yRange: Vec2 } } })._flyController;
+      fly._targetPose.yRange.set(opts.minCameraY, Infinity);
+    }
 
     // Streaming / LOD settings
     const gs = app.scene.gsplat;
@@ -168,6 +182,7 @@ export class Viewer {
     if (opts.showStats) new MiniStats(app);
 
     const viewer = new Viewer(app, camera, controls);
+    viewer.minCameraY = opts.minCameraY ?? -Infinity;
     viewer.setPose(opts.initialPose);
     await viewer.loadSplat(opts.modelUrl, opts.onProgress);
     return viewer;

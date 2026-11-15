@@ -237,8 +237,16 @@ html, body {
   overflow: hidden;
   perspective: 900px;
   perspective-origin: 0% 50%; /* the viewer sits left of the rail, towards the scene */
-  /* a soft shade behind the cards so they read against bright sky */
-  background: radial-gradient(ellipse 70% 60% at 100% 50%, rgba(10, 8, 6, 0.45), transparent 70%);
+  /* a dark band behind the cards, fading out to the left, so the carousel reads apart from the scan */
+  background: linear-gradient(
+    to left,
+    rgba(9, 9, 10, 0.86) 0%,
+    rgba(9, 9, 10, 0.78) 60%,
+    rgba(9, 9, 10, 0.45) 85%,
+    rgba(9, 9, 10, 0) 100%
+  );
+  user-select: none; /* dragging across the cards mustn't select their titles */
+  -webkit-user-select: none;
 }
 .rail.is-dragging { cursor: grabbing; }
 .rail[data-mode='flat'] { perspective: none; }
