@@ -179,6 +179,10 @@ The splat fills the window over a near-black background (#09090a), with a soft v
 - Point at the floor: a thin white ring shows where you'd go, only on floor you could stand on. Click to walk there (straight line, no route-finding). Drag to look around; WASD to walk, Shift to run, Esc to stop. Picking a stop leaves walk mode.
 - Collision uses a 10 cm voxel grid built from the cropped scan by `tools/prepare-model.sh` (`public/collision/`, ~1 MB) and read with PlayCanvas's `VoxelOccupancy`, no physics engine: gravity onto the floor, step-ups to 45 cm, a 30 cm-radius body that slides along walls. The grid is in splat-transform's frame, the world turned 180° about Z.
 
+**Link previews and icon**
+
+- `index.html` carries Open Graph and Twitter card tags (title "Tucson Military Vehicle Museum: 3D tour", a one-line description) with `public/og-image.jpg`, a 1200×630 render of the top overview captured from the viewer. Image URLs are absolute (`https://paolotosolini.github.io/tucson-military-vehicles/…`). `public/favicon.svg` is a gold tank on dark. After changing the image, use Facebook's Sharing Debugger ("Scrape Again") to refresh cached previews.
+
 **Credit**
 
 - "Created by Paolo Tosolini", small at the bottom-right.

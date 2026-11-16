@@ -7,7 +7,7 @@ import { defineConfig, type Plugin } from 'vite';
  * public/. Only exists under `npm run dev` (never in the build), and only accepts these paths.
  */
 function devSave(): Plugin {
-  const allowed = /^(stops\.json|thumbs\/stop-\d+\.webp)$/;
+  const allowed = /^(stops\.json|thumbs\/stop-\d+\.webp|og-image\.jpg)$/; // og-image: the link-preview image
   // The dev server may be opened to the local network (to try the site on a phone); only this
   // computer may write files.
   const fromThisMachine = (req: { socket: { remoteAddress?: string } }) =>
